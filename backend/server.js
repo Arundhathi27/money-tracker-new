@@ -16,6 +16,7 @@ const invoiceRoutes = require('./routes/invoices');
 const dashboardRoutes = require('./routes/dashboard');
 const billingRoutes = require('./routes/billing');
 const savingsGoalsRoutes = require('./routes/savingsGoals');
+const budgetRoutes = require('./routes/budgets');
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/savings-goals', savingsGoalsRoutes);
+app.use('/api/budgets', budgetRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

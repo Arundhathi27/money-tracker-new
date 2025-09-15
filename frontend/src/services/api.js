@@ -99,6 +99,18 @@ export const savingsGoalsAPI = {
   getStats: () => api.get('/savings-goals/stats/summary'),
 };
 
+// Budgets API calls
+export const budgetsAPI = {
+  getAll: () => api.get('/budgets'),
+  getById: (id) => api.get(`/budgets/${id}`),
+  create: (budgetData) => api.post('/budgets', budgetData),
+  update: (id, budgetData) => api.put(`/budgets/${id}`, budgetData),
+  delete: (id) => api.delete(`/budgets/${id}`),
+  getAlerts: () => api.get('/budgets/alerts'),
+  getSummary: () => api.get('/budgets/summary/dashboard'),
+  resetAll: () => api.post('/budgets/reset/all'),
+};
+
 // Billing API calls
 export const billingAPI = {
   getBillingInfo: () => api.get('/billing/info'),

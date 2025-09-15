@@ -8,6 +8,7 @@ import AddTransaction from "views/Dashboard/AddTransaction.js";
 import Categories from "views/Dashboard/Categories.js";
 import TransactionChart from "views/Dashboard/TransactionChart.js";
 import SavingsGoals from "views/Dashboard/SavingsGoals.js";
+import Budgets from "views/Dashboard/Budgets.js";
 import SignIn from "views/Pages/SignIn.js";
 import SignUp from "views/Pages/SignUp.js";
 
@@ -61,6 +62,13 @@ var dashRoutes = [
     name: "Savings Goals",
     icon: <RocketIcon color='inherit' />,
     component: SavingsGoals,
+    layout: "/admin",
+  },
+  {
+    path: "/budgets",
+    name: "Budget Alerts",
+    icon: <CreditIcon color='inherit' />,
+    component: Budgets,
     layout: "/admin",
   },
   // Hidden route - not shown in sidebar but accessible via direct URL
