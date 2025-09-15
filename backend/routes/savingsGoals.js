@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const SavingsGoal = require('../models/SavingsGoal');
 const { authenticateToken } = require('../middleware/auth');
+const savingsGoalService = require('../services/savingsGoalService');
 
 // Get all savings goals for a user
 router.get('/', authenticateToken, async (req, res) => {

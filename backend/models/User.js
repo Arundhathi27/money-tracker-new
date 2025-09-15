@@ -37,6 +37,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  income: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   address: {
     type: String,
     default: ''

@@ -88,6 +88,17 @@ export const dashboardAPI = {
   getOverview: () => api.get('/dashboard/overview'),
 };
 
+// Savings Goals API calls
+export const savingsGoalsAPI = {
+  getAll: () => api.get('/savings-goals'),
+  getById: (id) => api.get(`/savings-goals/${id}`),
+  create: (goalData) => api.post('/savings-goals', goalData),
+  update: (id, goalData) => api.put(`/savings-goals/${id}`, goalData),
+  delete: (id) => api.delete(`/savings-goals/${id}`),
+  addSavings: (id, amount) => api.post(`/savings-goals/${id}/add-savings`, { amount }),
+  getStats: () => api.get('/savings-goals/stats/summary'),
+};
+
 // Billing API calls
 export const billingAPI = {
   getBillingInfo: () => api.get('/billing/info'),
@@ -95,7 +106,7 @@ export const billingAPI = {
   updateBillingInfo: (id, billingData) => api.put(`/billing/info/${id}`, billingData),
   deleteBillingInfo: (id) => api.delete(`/billing/info/${id}`),
   getPaymentMethods: () => api.get('/billing/payment-methods'),
-  addPaymentMethod: (methodData) => api.post('/billing/payment-methods', methodData),
+  addPaymentMethod: (methodData) => api.post('/billing-payment-methods', methodData),
   deletePaymentMethod: (id) => api.delete(`/billing/payment-methods/${id}`),
   getPaymentHistory: (params = {}) => api.get('/billing/history', { params }),
   getBillingSummary: () => api.get('/billing/summary'),
