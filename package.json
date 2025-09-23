@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
+    "pdfkit": "^0.17.2",
+    "xlsx": "^0.18.5"
+  }
+}
