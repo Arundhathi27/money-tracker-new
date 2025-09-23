@@ -25,16 +25,20 @@ import AdminLayout from "layouts/Admin.js";
 import { ChakraProvider } from "@chakra-ui/react";
 // Custom Chakra theme
 import theme from "theme/theme.js";
+// Notification Context
+import { NotificationProvider } from "contexts/NotificationContext.js";
 
 ReactDOM.render(
   <ChakraProvider theme={theme} resetCss={false} position="relative">
-    <HashRouter>
-      <Switch>
-        <Route path={`/auth`} component={AuthLayout} />
-        <Route path={`/admin`} component={AdminLayout} />
-        <Redirect from={`/`} to="/admin/dashboard" />
-      </Switch>
-    </HashRouter>
+    <NotificationProvider>
+      <HashRouter>
+        <Switch>
+          <Route path={`/auth`} component={AuthLayout} />
+          <Route path={`/admin`} component={AdminLayout} />
+          <Redirect from={`/`} to="/admin/dashboard" />
+        </Switch>
+      </HashRouter>
+    </NotificationProvider>
   </ChakraProvider>,
   document.getElementById("root")
 );

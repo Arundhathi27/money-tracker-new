@@ -8,20 +8,22 @@ import {
   MenuButton,
   MenuItem,
   MenuList, Stack, Text, useColorMode,
-  useColorModeValue
+  useColorModeValue,
+  Badge,
+  Divider,
+  Spinner,
+  VStack,
+  HStack
 } from "@chakra-ui/react";
-// Assets
-import avatar1 from "assets/img/avatars/avatar1.png";
-import avatar2 from "assets/img/avatars/avatar2.png";
-import avatar3 from "assets/img/avatars/avatar3.png";
 // Custom Icons
 import { ProfileIcon, SettingsIcon } from "components/Icons/Icons";
 // Custom Components
-import { ItemContent } from "components/Menu/ItemContent";
 import { SearchBar } from "components/Navbars/SearchBar/SearchBar";
 import { SidebarResponsive } from "components/Sidebar/Sidebar";
+import NotificationItem from "components/Notifications/NotificationItem";
+import { useNotifications } from "contexts/NotificationContext";
 import React, { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useHistory } from "react-router-dom";
 import routes from "routes.js";
 import { isAuthenticated, getUser, setAuthToken, profileUpdateEvent } from "services/api.js";
 
@@ -39,6 +41,34 @@ export default function HeaderLinks(props) {
   const { colorMode } = useColorMode();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const history = useHistory();
+  
+  // Use notifications context
+  const { 
+    notifications, 
+    unreadCount, 
+    isLoading: notificationsLoading, 
+    markAsRead, 
+    markAllAsRead,
+    refreshNotifications 
+  } = useNotifications();
+
+  // Handle notification click navigation
+  const handleNotificationClick = (notification) => {
+    // Mark as read
+    if (!notification.isRead) {
+      markAsRead(notification.id);
+    }
+    
+    // Navigate based on notification type
+    switch (notification.type) {
+      case 'budget_alert':
+        history.push('/admin/budgets');
+        break;
+      default:
+        console.log('No navigation defined for notification type:', notification.type);
+    }
+  };
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -181,39 +211,96 @@ export default function HeaderLinks(props) {
               </Menu>
               
               <Menu>
-                <MenuButton>
+                <MenuButton position="relative">
                   <BellIcon color={navbarIcon} w="18px" h="18px" />
+                  {unreadCount > 0 && (
+                    <Badge
+                      position="absolute"
+                      top="-8px"
+                      right="-8px"
+                      colorScheme="red"
+                      borderRadius="full"
+                      fontSize="xs"
+                      minW="18px"
+                      h="18px"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Badge>
+                  )}
                 </MenuButton>
-                <MenuList p="16px 8px" bg={menuBg}>
-                  <Flex flexDirection="column">
-                    <MenuItem borderRadius="8px" mb="10px">
-                      <ItemContent
-                        time="13 minutes ago"
-                        info="from Alicia"
-                        boldInfo="New Message"
-                        aName="Alicia"
-                        aSrc={avatar1}
-                      />
-                    </MenuItem>
-                    <MenuItem borderRadius="8px" mb="10px">
-                      <ItemContent
-                        time="2 days ago"
-                        info="by Josh Henry"
-                        boldInfo="New Album"
-                        aName="Josh Henry"
-                        aSrc={avatar2}
-                      />
-                    </MenuItem>
-                    <MenuItem borderRadius="8px">
-                      <ItemContent
-                        time="3 days ago"
-                        info="Payment successfully completed!"
-                        boldInfo=""
-                        aName="Kara"
-                        aSrc={avatar3}
-                      />
-                    </MenuItem>
-                  </Flex>
+                <MenuList p="0" bg={menuBg} maxW="350px" w="350px">
+                  <Box p="16px 16px 8px 16px">
+                    <HStack justify="space-between" align="center">
+                      <Text fontSize="md" fontWeight="semibold">
+                        Notifications
+                      </Text>
+                      {notifications.length > 0 && (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={markAllAsRead}
+                          fontSize="xs"
+                        >
+                          Mark all read
+                        </Button>
+                      )}
+                    </HStack>
+                  </Box>
+                  
+                  <Divider />
+                  
+                  <Box maxH="400px" overflowY="auto">
+                    {notificationsLoading ? (
+                      <Flex justify="center" p="20px">
+                        <Spinner size="sm" />
+                      </Flex>
+                    ) : notifications.length > 0 ? (
+                      <VStack spacing={0} align="stretch">
+                        {notifications.slice(0, 10).map((notification) => (
+                          <Box key={notification.id} p="8px 16px">
+                            <NotificationItem
+                              notification={notification}
+                              onMarkAsRead={markAsRead}
+                              onClick={handleNotificationClick}
+                            />
+                          </Box>
+                        ))}
+                        {notifications.length > 10 && (
+                          <Box p="12px 16px" textAlign="center">
+                            <Text fontSize="xs" color="gray.500">
+                              +{notifications.length - 10} more notifications
+                            </Text>
+                          </Box>
+                        )}
+                      </VStack>
+                    ) : (
+                      <Box p="20px" textAlign="center">
+                        <Text fontSize="sm" color="gray.500">
+                          No notifications
+                        </Text>
+                      </Box>
+                    )}
+                  </Box>
+                  
+                  {notifications.length > 0 && (
+                    <>
+                      <Divider />
+                      <Box p="12px 16px" textAlign="center">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={refreshNotifications}
+                          fontSize="xs"
+                          w="full"
+                        >
+                          Refresh
+                        </Button>
+                      </Box>
+                    </>
+                  )}
                 </MenuList>
               </Menu>
             </Flex>
@@ -370,39 +457,96 @@ export default function HeaderLinks(props) {
         />
         
         <Menu>
-          <MenuButton>
+          <MenuButton position="relative">
             <BellIcon color={navbarIcon} w='18px' h='18px' />
+            {unreadCount > 0 && (
+              <Badge
+                position="absolute"
+                top="-8px"
+                right="-8px"
+                colorScheme="red"
+                borderRadius="full"
+                fontSize="xs"
+                minW="18px"
+                h="18px"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Badge>
+            )}
           </MenuButton>
-          <MenuList p='16px 8px' bg={menuBg}>
-            <Flex flexDirection='column'>
-              <MenuItem borderRadius='8px' mb='10px'>
-                <ItemContent
-                  time='13 minutes ago'
-                  info='from Alicia'
-                  boldInfo='New Message'
-                  aName='Alicia'
-                  aSrc={avatar1}
-                />
-              </MenuItem>
-              <MenuItem borderRadius='8px' mb='10px'>
-                <ItemContent
-                  time='2 days ago'
-                  info='by Josh Henry'
-                  boldInfo='New Album'
-                  aName='Josh Henry'
-                  aSrc={avatar2}
-                />
-              </MenuItem>
-              <MenuItem borderRadius='8px'>
-                <ItemContent
-                  time='3 days ago'
-                  info='Payment successfully completed!'
-                  boldInfo=''
-                  aName='Kara'
-                  aSrc={avatar3}
-                />
-              </MenuItem>
-            </Flex>
+          <MenuList p="0" bg={menuBg} maxW="350px" w="350px">
+            <Box p="16px 16px 8px 16px">
+              <HStack justify="space-between" align="center">
+                <Text fontSize="md" fontWeight="semibold">
+                  Notifications
+                </Text>
+                {notifications.length > 0 && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={markAllAsRead}
+                    fontSize="xs"
+                  >
+                    Mark all read
+                  </Button>
+                )}
+              </HStack>
+            </Box>
+            
+            <Divider />
+            
+            <Box maxH="400px" overflowY="auto">
+              {notificationsLoading ? (
+                <Flex justify="center" p="20px">
+                  <Spinner size="sm" />
+                </Flex>
+              ) : notifications.length > 0 ? (
+                <VStack spacing={0} align="stretch">
+                  {notifications.slice(0, 10).map((notification) => (
+                    <Box key={notification.id} p="8px 16px">
+                      <NotificationItem
+                        notification={notification}
+                        onMarkAsRead={markAsRead}
+                        onClick={handleNotificationClick}
+                      />
+                    </Box>
+                  ))}
+                  {notifications.length > 10 && (
+                    <Box p="12px 16px" textAlign="center">
+                      <Text fontSize="xs" color="gray.500">
+                        +{notifications.length - 10} more notifications
+                      </Text>
+                    </Box>
+                  )}
+                </VStack>
+              ) : (
+                <Box p="20px" textAlign="center">
+                  <Text fontSize="sm" color="gray.500">
+                    No notifications
+                  </Text>
+                </Box>
+              )}
+            </Box>
+            
+            {notifications.length > 0 && (
+              <>
+                <Divider />
+                <Box p="12px 16px" textAlign="center">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={refreshNotifications}
+                    fontSize="xs"
+                    w="full"
+                  >
+                    Refresh
+                  </Button>
+                </Box>
+              </>
+            )}
           </MenuList>
         </Menu>
       </Flex>
