@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { budgetsAPI } from '../services/api';
 
 const NotificationContext = createContext();
@@ -16,6 +16,11 @@ export const NotificationProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Popup notification state
+  const [popupNotifications, setPopupNotifications] = useState([]);
+  const [shownPopupIds, setShownPopupIds] = useState(new Set());
+  const popupTimeoutsRef = useRef({});
 
   // Fetch budget alerts and convert them to notifications
   const fetchBudgetAlerts = useCallback(async () => {
@@ -109,6 +114,66 @@ export const NotificationProvider = ({ children }) => {
     setUnreadCount(0);
   }, []);
 
+  // Popup notification methods
+  const showPopupNotification = useCallback((notification) => {
+    const popupId = `popup-${Date.now()}-${Math.random()}`;
+
+    // Create popup notification object
+    const popupNotification = {
+      ...notification,
+      id: popupId,
+      isPopup: true
+    };
+
+    // Add to popup notifications
+    setPopupNotifications(prev => [...prev, popupNotification]);
+
+    // Auto-remove after duration
+    const duration = notification.priority === 'high' ? 6000 : 4000;
+    popupTimeoutsRef.current[popupId] = setTimeout(() => {
+      closePopupNotification(popupId);
+    }, duration);
+
+    return popupId;
+  }, []);
+
+  const closePopupNotification = useCallback((popupId) => {
+    // Clear timeout if exists
+    if (popupTimeoutsRef.current[popupId]) {
+      clearTimeout(popupTimeoutsRef.current[popupId]);
+      delete popupTimeoutsRef.current[popupId];
+    }
+
+    // Remove from popup notifications
+    setPopupNotifications(prev => prev.filter(n => n.id !== popupId));
+  }, []);
+
+  const closeAllPopupNotifications = useCallback(() => {
+    // Clear all timeouts
+    Object.values(popupTimeoutsRef.current).forEach(timeout => {
+      clearTimeout(timeout);
+    });
+    popupTimeoutsRef.current = {};
+
+    // Clear all popup notifications
+    setPopupNotifications([]);
+  }, []);
+
+  // Show popup for high priority notifications when they are added (only once per notification)
+  useEffect(() => {
+    const highPriorityNotifications = notifications.filter(
+      n => n.priority === 'high' && !n.isRead && !shownPopupIds.has(n.id)
+    );
+
+    highPriorityNotifications.forEach(notification => {
+      // Mark this notification as shown
+      setShownPopupIds(prev => new Set([...prev, notification.id]));
+
+      // Show popup notification
+      showPopupNotification(notification);
+    });
+  }, [notifications, shownPopupIds, showPopupNotification]);
+
   // Auto-fetch notifications on mount and set up periodic refresh
   useEffect(() => {
     fetchNotifications();
@@ -128,7 +193,12 @@ export const NotificationProvider = ({ children }) => {
     markAsRead,
     markAllAsRead,
     clearAll,
-    refreshNotifications: fetchNotifications
+    refreshNotifications: fetchNotifications,
+    // Popup notification methods
+    popupNotifications,
+    showPopupNotification,
+    closePopupNotification,
+    closeAllPopupNotifications
   };
 
   return (

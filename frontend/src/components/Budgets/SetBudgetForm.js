@@ -24,7 +24,7 @@ const SetBudgetForm = ({ onSubmit, initialData = null }) => {
     period: initialData?.period || 'monthly',
     alertThresholds: initialData?.alertThresholds || { warning: 80, exceeded: 100 }
   });
-  const [categories, setCategories] = useState(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other']);
+  const [categories, setCategories] = useState(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other', 'Groceries', 'Dining', 'Fuel', 'Utilities', 'Insurance', 'Entertainment', 'Travel', 'Personal Care', 'Subscriptions', 'Miscellaneous']);
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
 
@@ -47,19 +47,21 @@ const SetBudgetForm = ({ onSubmit, initialData = null }) => {
 
         // If we have expense categories, use them, otherwise use fallback
         if (expenseCategories.length > 0) {
-          setCategories(expenseCategories);
+          // Combine with common categories to ensure all options are available
+          const allCategories = [...new Set([...expenseCategories, ...categories])].sort();
+          setCategories(allCategories);
         } else {
-          // No expense transactions found, use common categories
-          setCategories(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other']);
+          // No expense transactions found, use comprehensive categories
+          setCategories(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other', 'Groceries', 'Dining', 'Fuel', 'Utilities', 'Insurance', 'Travel', 'Personal Care', 'Subscriptions', 'Miscellaneous']);
         }
       } else {
-        // No transactions or API response issue, use fallback categories
-        setCategories(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other']);
+        // No transactions or API response issue, use comprehensive categories
+        setCategories(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other', 'Groceries', 'Dining', 'Fuel', 'Utilities', 'Insurance', 'Travel', 'Personal Care', 'Subscriptions', 'Miscellaneous']);
       }
     } catch (error) {
       console.error('Error loading categories:', error);
-      // Fallback to common categories
-      setCategories(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other']);
+      // Fallback to comprehensive categories
+      setCategories(['Food', 'Transportation', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Education', 'Other', 'Groceries', 'Dining', 'Fuel', 'Utilities', 'Insurance', 'Travel', 'Personal Care', 'Subscriptions', 'Miscellaneous']);
     }
   };
 

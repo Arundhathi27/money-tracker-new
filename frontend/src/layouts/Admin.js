@@ -23,6 +23,8 @@ import PanelContainer from "../components/Layout/PanelContainer";
 import PanelContent from "../components/Layout/PanelContent";
 import { TransactionProvider } from "../contexts/TransactionContext";
 import { SavingsGoalProvider } from "../contexts/SavingsGoalContext";
+import { useNotifications } from "../contexts/NotificationContext";
+import NotificationContainer from "../components/Notifications/NotificationContainer";
 import bgAdmin from "assets/img/admin-background.png";
 
 export default function Dashboard(props) {
@@ -30,6 +32,9 @@ export default function Dashboard(props) {
   // states and functions
   const [fixed, setFixed] = useState(false);
   const { colorMode } = useColorMode();
+
+  // Get popup notifications from context
+  const { popupNotifications, closePopupNotification } = useNotifications();
   // functions for changing the states from components
   const getRoute = () => {
     return window.location.pathname !== "/admin/full-screen-maps";
@@ -106,6 +111,11 @@ export default function Dashboard(props) {
     <TransactionProvider>
       <SavingsGoalProvider>
         <Box>
+          {/* Notification Container for popup notifications */}
+          <NotificationContainer
+            notifications={popupNotifications}
+            onClose={closePopupNotification}
+          />
       <Box
         minH='40vh'
         w='100%'
