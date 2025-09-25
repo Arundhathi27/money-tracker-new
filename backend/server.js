@@ -18,6 +18,7 @@ const billingRoutes = require('./routes/billing');
 const savingsGoalsRoutes = require('./routes/savingsGoals');
 const budgetRoutes = require('./routes/budgets');
 const exportRoutes = require('./routes/export');
+const currencyRoutes = require('./routes/currency');
 
 const app = express();
 
@@ -30,14 +31,24 @@ app.use(helmet());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 500, // limit each IP to 500 requests per windowMs for development
+  message: 'Too many requests from this IP, please try again later.'
 });
 app.use(limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:3002'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Body parsing middleware
@@ -57,6 +68,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/savings-goals', savingsGoalsRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/currency', currencyRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

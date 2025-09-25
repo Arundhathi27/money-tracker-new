@@ -111,6 +111,13 @@ export const budgetsAPI = {
   resetAll: () => api.post('/budgets/reset/all'),
 };
 
+// Currency API calls
+export const currencyAPI = {
+  getRates: (baseCurrency) => api.get(`/currency/rates/${baseCurrency}`),
+  convert: (conversionData) => api.post('/currency/convert', conversionData),
+  convertTransactions: (targetCurrency) => api.post('/currency/convert-transactions', { targetCurrency }),
+};
+
 // Billing API calls
 export const billingAPI = {
   getBillingInfo: () => api.get('/billing/info'),
