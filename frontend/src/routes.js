@@ -10,6 +10,7 @@ import TransactionChart from "views/Dashboard/TransactionChart.js";
 import SavingsGoals from "views/Dashboard/SavingsGoals.js";
 import Budgets from "views/Dashboard/Budgets.js";
 import CurrencyConverter from "views/Dashboard/CurrencyConverter.js";
+import ExpenseCalendar from "views/Dashboard/ExpenseCalendar.js";
 import SignIn from "views/Pages/SignIn.js";
 import SignUp from "views/Pages/SignUp.js";
 
@@ -77,6 +78,13 @@ var dashRoutes = [
     name: "Currency Converter",
     icon: <CreditIcon color='inherit' />,
     component: CurrencyConverter,
+    layout: "/admin",
+  },
+  {
+    path: "/expense-calendar",
+    name: "Expense Calendar",
+    icon: <StatsIcon color='inherit' />,
+    component: ExpenseCalendar,
     layout: "/admin",
   },
   // Hidden route - not shown in sidebar but accessible via direct URL
