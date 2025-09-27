@@ -24,6 +24,7 @@ import Card from "components/Card/Card.js";
 import BarChart from "components/Charts/BarChart";
 import LineChart from "components/Charts/LineChart";
 import IconBox from "components/Icons/IconBox";
+import SimpleAnalytics from "components/Dashboard/SimpleAnalytics";
 // Custom icons
 import {
   CartIcon,
@@ -395,6 +396,11 @@ export default function Dashboard() {
           </Box>
         </Card>
       </Grid>
+
+              {/* Simple Analytics Section */}
+              <Box mt={8}>
+                <SimpleAnalytics />
+              </Box>
     </Flex>
   );
 }

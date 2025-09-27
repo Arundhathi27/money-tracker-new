@@ -1,4 +1,5 @@
-// Chakra Imports
+// ✅ Put all imports at the very top
+import React, { useState } from "react";
 import {
   Box,
   Button,
@@ -7,183 +8,156 @@ import {
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
-  Flex, Link,
+  Flex,
   Switch,
   Text,
   useColorMode,
-  useColorModeValue
+  useColorModeValue,
+  Select,
+  Input
 } from "@chakra-ui/react";
-import { HSeparator } from "components/Separator/Separator";
-import React, { useState } from "react";
-import GitHubButton from "react-github-btn";
-import { FaFacebook, FaTwitter } from "react-icons/fa";
+
+// Simple horizontal separator
+function HSeparator() {
+  return <Box h="1px" bg="gray.300" my="12px" />;
+}
 
 export default function Configurator(props) {
   const {
-    sidebarVariant,
-    setSidebarVariant,
-    secondary,
     isOpen,
     onClose,
-    fixed,
-    ...rest
+    onSwitch,
+    onLanguageChange,
+    onPrimaryColorChange,
+    onFontSizeChange,
+    onNotificationToggle,
+    onTimeFormatChange,
+    onLogout
   } = props;
-  const [switched, setSwitched] = useState(props.isChecked);
+
+  const [navbarFixed, setNavbarFixed] = useState(false);
+  const [language, setLanguage] = useState("en");
+  const [primaryColor, setPrimaryColor] = useState("#3182ce");
+  const [fontSize, setFontSize] = useState("md");
+  const [notifications, setNotifications] = useState(true);
+  const [timeFormat24, setTimeFormat24] = useState(false);
 
   const { colorMode, toggleColorMode } = useColorMode();
+  const bgDrawer = useColorModeValue("white", "gray.800");
 
-  let bgButton = useColorModeValue(
-    "linear-gradient(81.62deg, #313860 2.25%, #151928 79.87%)",
-    "white"
-  );
-  let colorButton = useColorModeValue("white", "gray.700");
-  const secondaryButtonBg = useColorModeValue("white", "transparent");
-  const secondaryButtonBorder = useColorModeValue("gray.700", "white");
-  const secondaryButtonColor = useColorModeValue("gray.700", "white");
-  const bgDrawer = useColorModeValue("white", "navy.800");
-  const settingsRef = React.useRef();
+  // Apply changes to parent
+  const handleApply = () => {
+    onSwitch?.(navbarFixed);
+    onLanguageChange?.(language);
+    onPrimaryColorChange?.(primaryColor);
+    onFontSizeChange?.(fontSize);
+    onNotificationToggle?.(notifications);
+    onTimeFormatChange?.(timeFormat24);
+    onClose();
+  };
+
   return (
-    <>
-      <Drawer
-        isOpen={props.isOpen}
-        onClose={props.onClose}
-        placement={document.documentElement.dir === "rtl" ? "left" : "right"}
-        finalFocusRef={settingsRef}
-        blockScrollOnMount={false}
-      >
-        <DrawerContent bg={bgDrawer}>
-          <DrawerHeader pt="24px" px="24px">
-            <DrawerCloseButton />
-            <Text fontSize="xl" fontWeight="bold" mt="16px">
-              Argon Chakra Configurator
-            </Text>
-            <Text fontSize="md" mb="16px">
-              See your dashboard options.
-            </Text>
-            <HSeparator />
-          </DrawerHeader>
-          <DrawerBody w="340px" ps="24px" pe="40px">
-            <Flex flexDirection="column">
-              <Flex justifyContent="space-between " mb="16px">
-                <Text fontSize="md" fontWeight="600" mb="4px">
-                  Navbar Fixed
-                </Text>
-                <Switch
-                  colorScheme="blue"
-                  isChecked={switched}
-                  onChange={() => {
-                    if (switched === true) {
-                      props.onSwitch(false);
-                      setSwitched(false);
-                    } else {
-                      props.onSwitch(true);
-                      setSwitched(true);
-                    }
-                  }}
-                />
-              </Flex>
-              <Flex
-                justifyContent="space-between"
-                alignItems="center"
-                mb="24px"
-              >
-                <Text fontSize="md" fontWeight="600" mb="4px">
-                  Dark/Light
-                </Text>
-                <Button
-                  onClick={toggleColorMode}
-                  color={colorMode === "light" ? "Dark" : "Light"}
-                >
-                  Toggle {colorMode === "light" ? "Dark" : "Light"}
-                </Button>
-              </Flex>
+    <Drawer
+      isOpen={isOpen}
+      onClose={onClose}
+      placement={document.documentElement.dir === "rtl" ? "left" : "right"}
+    >
+      <DrawerContent bg={bgDrawer}>
+        <DrawerCloseButton />
+        <DrawerHeader>Settings</DrawerHeader>
 
-              <HSeparator />
-              <Box mt="24px">
-                <Box>
-                  <Link
-                    href="https://www.creative-tim.com/product/argon-dashboard-chakra?ref=creativetim-pud"
-                    w="100%"
-                    mb="16px"
-                  >
-                    <Button
-                      w="100%"
-                      mb="16px"
-                      bg={bgButton}
-                      color={colorButton}
-                      fontSize="xs"
-                      variant="no-effects"
-                      px="30px"
-                    >
-                      Free Download
-                    </Button>
-                  </Link>
-                  <Link
-                    href="https://demos.creative-tim.com/docs-argon-dashboard-chakra/?ref=creativetim-pud"
-                    w="100%"
-                  >
-                    <Button
-                      w="100%"
-                      bg={secondaryButtonBg}
-                      border="1px solid"
-                      borderColor={secondaryButtonBorder}
-                      color={secondaryButtonColor}
-                      fontSize="xs"
-                      variant="no-effects"
-                      px="20px"
-                      mb="16px"
-                    >
-                      <Text textDecorationColor="none">Documentation</Text>
-                    </Button>
-                  </Link>
-                </Box>
-                <Flex
-                  justifyContent="center"
-                  alignItems="center"
-                  w="100%"
-                  mb="16px"
-                >
-                  <GitHubButton
-                    href="https://github.com/creativetimofficial/argon-dashboard-chakra"
-                    data-icon="octicon-star"
-                    data-show-count="true"
-                    aria-label="Star creativetimofficial/argon-dashboard-chakra on GitHub"
-                  >
-                    Star
-                  </GitHubButton>
-                </Flex>
-                <Box w="100%">
-                  <Text mb="6px" textAlign="center">
-                    Thank you for sharing!
-                  </Text>
-                  <Flex justifyContent="center" alignContent="center">
-                    <Link
-                      isExternal="true"
-                      href="https://twitter.com/intent/tweet?url=https://www.creative-tim.com/product/argon-dashboard-chakra/&text=Check%20Argon%20Dashboard%20Chakra%20made%20by%20@simmmple_web%20and%20@CreativeTim"
-                    >
-                      <Button
-                        colorScheme="twitter"
-                        leftIcon={<FaTwitter />}
-                        me="10px"
-                      >
-                        <Text>Tweet</Text>
-                      </Button>
-                    </Link>
-                    <Link
-                      isExternal="true"
-                      href="https://www.facebook.com/sharer/sharer.php?u=https://www.creative-tim.com/product/argon-dashboard-chakra/"
-                    >
-                      <Button colorScheme="facebook" leftIcon={<FaFacebook />}>
-                        <Text>Share</Text>
-                      </Button>
-                    </Link>
-                  </Flex>
-                </Box>
-              </Box>
+        <DrawerBody>
+          <Flex direction="column" gap="20px">
+            {/* 🌐 Language */}
+            <Flex justify="space-between" align="center">
+              <Text>Language</Text>
+              <Select
+                value={language}
+                w="150px"
+                size="sm"
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                <option value="en">English</option>
+                <option value="ta">தமிழ்</option>
+                <option value="hi">हिन्दी</option>
+              </Select>
             </Flex>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-    </>
+
+            {/* 📌 Navbar Fixed */}
+            <Flex justify="space-between" align="center">
+              <Text>Navbar Fixed</Text>
+              <Switch
+                isChecked={navbarFixed}
+                onChange={() => setNavbarFixed(!navbarFixed)}
+              />
+            </Flex>
+
+            {/* 🌙 Theme */}
+            <Flex justify="space-between" align="center">
+              <Text>Theme</Text>
+              <Button size="sm" onClick={toggleColorMode}>
+                Toggle {colorMode === "light" ? "Dark" : "Light"}
+              </Button>
+            </Flex>
+
+            {/* 🎨 Primary Color */}
+            <Flex justify="space-between" align="center">
+              <Text>Primary Color</Text>
+              <Input
+                type="color"
+                value={primaryColor}
+                w="60px"
+                p="0"
+                onChange={(e) => setPrimaryColor(e.target.value)}
+              />
+            </Flex>
+
+            {/* 🔠 Font Size */}
+            <Flex justify="space-between" align="center">
+              <Text>Font Size</Text>
+              <Select
+                value={fontSize}
+                w="100px"
+                size="sm"
+                onChange={(e) => setFontSize(e.target.value)}
+              >
+                <option value="sm">Small</option>
+                <option value="md">Medium</option>
+                <option value="lg">Large</option>
+              </Select>
+            </Flex>
+
+            {/* 🔔 Notifications */}
+            <Flex justify="space-between" align="center">
+              <Text>Notifications</Text>
+              <Switch
+                isChecked={notifications}
+                onChange={() => setNotifications(!notifications)}
+              />
+            </Flex>
+
+            {/* ⏰ Time Format */}
+            <Flex justify="space-between" align="center">
+              <Text>24-Hour Time</Text>
+              <Switch
+                isChecked={timeFormat24}
+                onChange={() => setTimeFormat24(!timeFormat24)}
+              />
+            </Flex>
+
+            <HSeparator />
+
+            {/* 🚪 Logout */}
+            <Button colorScheme="red" onClick={onLogout}>
+              Log Out
+            </Button>
+
+            <Button mt={4} colorScheme="blue" onClick={handleApply}>
+              Apply Changes
+            </Button>
+          </Flex>
+        </DrawerBody>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -12,7 +12,7 @@
 - [ ] Implement responsive layout
 - [ ] Add proper loading states and error handling
 - [ ] Update CurrencyConverterView wrapper
-- [ ] Test responsive design across different screen sizes
+- [ ] Test respon sive design across different screen sizes
 
 ### 📋 Implementation Steps
 
