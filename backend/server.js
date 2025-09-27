@@ -19,6 +19,7 @@ const savingsGoalsRoutes = require('./routes/savingsGoals');
 const budgetRoutes = require('./routes/budgets');
 const exportRoutes = require('./routes/export');
 const currencyRoutes = require('./routes/currency');
+const groupRoutes = require('./routes/groups');
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use('/api/savings-goals', savingsGoalsRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/currency', currencyRoutes);
+app.use('/api/groups', groupRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

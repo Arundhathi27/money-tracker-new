@@ -118,6 +118,23 @@ export const currencyAPI = {
   convertTransactions: (targetCurrency) => api.post('/currency/convert-transactions', { targetCurrency }),
 };
 
+// Groups API calls
+export const groupsAPI = {
+  getGroups: () => api.get('/groups'),
+  getGroup: (groupId) => api.get(`/groups/${groupId}`),
+  createGroup: (groupData) => api.post('/groups', groupData),
+  updateGroup: (groupId, groupData) => api.put(`/groups/${groupId}`, groupData),
+  deleteGroup: (groupId) => api.delete(`/groups/${groupId}`),
+  addFriendToGroup: (groupId, friendData) => api.post(`/groups/${groupId}/friends`, friendData),
+  getGroupExpenses: (groupId, filters) => api.get(`/groups/${groupId}/expenses`, { params: filters }),
+  addGroupExpense: (groupId, expenseData) => api.post(`/groups/${groupId}/expenses`, expenseData),
+  getGroupBalances: (groupId) => api.get(`/groups/${groupId}/balances`),
+  getSettlementSuggestions: (groupId) => api.get(`/groups/${groupId}/settle-suggestions`),
+  createSettlement: (groupId, settlementData) => api.post(`/groups/${groupId}/settlements`, settlementData),
+  completeSettlement: (groupId, settlementId) => api.post(`/groups/${groupId}/settlements/${settlementId}/complete`),
+  getSettlements: (groupId) => api.get(`/groups/${groupId}/settlements`),
+};
+
 // Billing API calls
 export const billingAPI = {
   getBillingInfo: () => api.get('/billing/info'),

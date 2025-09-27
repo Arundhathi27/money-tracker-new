@@ -27,17 +27,21 @@ import { ChakraProvider } from "@chakra-ui/react";
 import theme from "theme/theme.js";
 // Notification Context
 import { NotificationProvider } from "contexts/NotificationContext.js";
+// Group Context
+import { GroupProvider } from "contexts/GroupContext.js";
 
 ReactDOM.render(
   <ChakraProvider theme={theme} resetCss={false} position="relative">
     <NotificationProvider>
-      <HashRouter>
-        <Switch>
-          <Route path={`/auth`} component={AuthLayout} />
-          <Route path={`/admin`} component={AdminLayout} />
-          <Redirect from={`/`} to="/admin/dashboard" />
-        </Switch>
-      </HashRouter>
+      <GroupProvider>
+        <HashRouter>
+          <Switch>
+            <Route path={`/auth`} component={AuthLayout} />
+            <Route path={`/admin`} component={AdminLayout} />
+            <Redirect from={`/`} to="/admin/dashboard" />
+          </Switch>
+        </HashRouter>
+      </GroupProvider>
     </NotificationProvider>
   </ChakraProvider>,
   document.getElementById("root")
