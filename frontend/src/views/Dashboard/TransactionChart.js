@@ -120,9 +120,9 @@ export default function TransactionChart() {
             </Text>
           </Text>
           <Text color="gray.400" fontSize="sm">
-            Total Transactions:{" "}
+            Total Categories:{" "}
             <Text as="span" color="blue.400" fontWeight="bold">
-              {transactions.length}
+              {chartData.options.labels.length}
             </Text>
           </Text>
         </Flex>
