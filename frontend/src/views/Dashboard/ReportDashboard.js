@@ -13,6 +13,17 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  Input,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  useDisclosure,
+  FormControl,
+  FormLabel,
 } from "@chakra-ui/react";
 import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ChevronDownIcon } from "@chakra-ui/icons";
 
@@ -63,6 +74,11 @@ export default function ReportDashboard() {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
   const categoryChartRef = useRef(null);
+  
+  // Custom date range states
+  const [customFromDate, setCustomFromDate] = useState("");
+  const [customToDate, setCustomToDate] = useState("");
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Colors
   const textColor = useColorModeValue("gray.700", "white");
@@ -76,7 +92,7 @@ export default function ReportDashboard() {
       processReportData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, selectedDate, transactions]);
+  }, [reportType, selectedDate, transactions, customFromDate, customToDate]);
 
   const getFormattedDateRange = () => {
     if (reportType === "daily") {
@@ -85,8 +101,13 @@ export default function ReportDashboard() {
       const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
       return `${format(weekStart, "dd MMM")} – ${format(weekEnd, "dd MMM yyyy")}`;
-    } else {
+    } else if (reportType === "monthly") {
       return format(selectedDate, "MMMM yyyy");
+    } else if (reportType === "custom") {
+      if (customFromDate && customToDate) {
+        return `${format(parseISO(customFromDate), "dd MMM yyyy")} – ${format(parseISO(customToDate), "dd MMM yyyy")}`;
+      }
+      return "Custom Range";
     }
   };
 
@@ -108,13 +129,22 @@ export default function ReportDashboard() {
         const transactionDate = parseISO(transaction.date);
         return transactionDate >= weekStart && transactionDate <= weekEnd;
       });
-    } else {
+    } else if (reportType === "monthly") {
       const monthStart = startOfMonth(selectedDate);
       const monthEnd = endOfMonth(selectedDate);
       filteredTransactions = transactions.filter((transaction) => {
         const transactionDate = parseISO(transaction.date);
         return transactionDate >= monthStart && transactionDate <= monthEnd;
       });
+    } else if (reportType === "custom") {
+      if (customFromDate && customToDate) {
+        const rangeStart = startOfDay(parseISO(customFromDate));
+        const rangeEnd = endOfDay(parseISO(customToDate));
+        filteredTransactions = transactions.filter((transaction) => {
+          const transactionDate = parseISO(transaction.date);
+          return transactionDate >= rangeStart && transactionDate <= rangeEnd;
+        });
+      }
     }
 
     return filteredTransactions;
@@ -133,11 +163,22 @@ export default function ReportDashboard() {
       const prevWeekEnd = endOfWeek(prevWeekStart);
       previousPeriodStart = prevWeekStart;
       previousPeriodEnd = prevWeekEnd;
-    } else {
+    } else if (reportType === "monthly") {
       const prevMonthStart = subMonths(startOfMonth(selectedDate), 1);
       const prevMonthEnd = endOfMonth(prevMonthStart);
       previousPeriodStart = prevMonthStart;
       previousPeriodEnd = prevMonthEnd;
+    } else if (reportType === "custom") {
+      // For custom range, calculate previous period of same duration
+      if (customFromDate && customToDate) {
+        const fromDate = parseISO(customFromDate);
+        const toDate = parseISO(customToDate);
+        const daysDiff = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24));
+        previousPeriodStart = startOfDay(subDays(fromDate, daysDiff + 1));
+        previousPeriodEnd = endOfDay(subDays(fromDate, 1));
+      } else {
+        return [];
+      }
     }
 
     return transactions.filter((transaction) => {
@@ -252,7 +293,7 @@ export default function ReportDashboard() {
           incomeData.push(dailyIncome);
           expenseData.push(dailyExpense);
         }
-      } else {
+      } else if (reportType === "monthly") {
         const monthStart = startOfMonth(selectedDate);
         const monthEnd = endOfMonth(selectedDate);
         const totalWeeks = Math.ceil((monthEnd.getDate() - monthStart.getDate() + 1) / 7);
@@ -272,6 +313,30 @@ export default function ReportDashboard() {
           chartLabels.push(`Week ${week + 1}`);
           incomeData.push(weeklyIncome);
           expenseData.push(weeklyExpense);
+        }
+      } else if (reportType === "custom" && customFromDate && customToDate) {
+        // For custom range, show daily data
+        const fromDate = parseISO(customFromDate);
+        const toDate = parseISO(customToDate);
+        const daysDiff = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
+        
+        for (let i = 0; i < daysDiff; i++) {
+          const currentDay = addDays(fromDate, i);
+          const dayStart = startOfDay(currentDay);
+          const dayEnd = endOfDay(currentDay);
+          const dailyTransactions = filteredTransactions.filter((t) => {
+            const d = parseISO(t.date);
+            return d >= dayStart && d <= dayEnd;
+          });
+          let dailyIncome = 0;
+          let dailyExpense = 0;
+          dailyTransactions.forEach((t) => {
+            if (t.type === "income") dailyIncome += parseFloat(t.amount);
+            else dailyExpense += parseFloat(t.amount);
+          });
+          chartLabels.push(format(currentDay, "dd MMM"));
+          incomeData.push(dailyIncome);
+          expenseData.push(dailyExpense);
         }
       }
 
@@ -324,17 +389,54 @@ export default function ReportDashboard() {
   };
 
   const handleReportTypeChange = (e) => {
-    setReportType(e.target.value);
-    setSelectedDate(new Date());
+    const newType = e.target.value;
+    setReportType(newType);
+    if (newType === "custom") {
+      onOpen();
+    } else {
+      setSelectedDate(new Date());
+    }
+  };
+
+  const handleCustomDateSubmit = () => {
+    if (!customFromDate || !customToDate) {
+      toast({
+        title: "Invalid Date Range",
+        description: "Please select both from and to dates",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const fromDate = parseISO(customFromDate);
+    const toDate = parseISO(customToDate);
+
+    if (fromDate > toDate) {
+      toast({
+        title: "Invalid Date Range",
+        description: "From date must be before to date",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    onClose();
+    processReportData();
   };
 
   const navigatePrevious = () => {
+    if (reportType === "custom") return;
     if (reportType === "daily") setSelectedDate(subDays(selectedDate, 1));
     else if (reportType === "weekly") setSelectedDate(subWeeks(selectedDate, 1));
     else setSelectedDate(subMonths(selectedDate, 1));
   };
 
   const navigateNext = () => {
+    if (reportType === "custom") return;
     if (reportType === "daily") setSelectedDate(addDays(selectedDate, 1));
     else if (reportType === "weekly") setSelectedDate(addWeeks(selectedDate, 1));
     else setSelectedDate(addMonths(selectedDate, 1));
@@ -357,7 +459,13 @@ export default function ReportDashboard() {
       setLoading(true);
       const title = "Money Tracker Detailed Report";
       const subtitle = `Period: ${getFormattedDateRange()}  •  View: ${reportType.charAt(0).toUpperCase()}${reportType.slice(1)}`;
-      const filename = `money-tracker-detailed-${reportType}-${format(selectedDate, "yyyy-MM-dd")}`;
+      
+      let filename;
+      if (reportType === "custom" && customFromDate && customToDate) {
+        filename = `money-tracker-detailed-custom-${customFromDate}-to-${customToDate}`;
+      } else {
+        filename = `money-tracker-detailed-${reportType}-${format(selectedDate, "yyyy-MM-dd")}`;
+      }
 
       exportToPDF(filtered, filename, { title, subtitle });
 
@@ -423,9 +531,16 @@ export default function ReportDashboard() {
             pdf.text(title, pdfWidth / 2, 20, { align: "center" });
             pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
             
-            const filename = exportType === 'categories'
-              ? `money-tracker-category-report-${reportType}-${format(selectedDate, "yyyy-MM-dd")}.pdf`
-              : `money-tracker-report-${reportType}-${format(selectedDate, "yyyy-MM-dd")}.pdf`;
+            let filename;
+            if (reportType === "custom" && customFromDate && customToDate) {
+              filename = exportType === 'categories'
+                ? `money-tracker-category-report-custom-${customFromDate}-to-${customToDate}.pdf`
+                : `money-tracker-report-custom-${customFromDate}-to-${customToDate}.pdf`;
+            } else {
+              filename = exportType === 'categories'
+                ? `money-tracker-category-report-${reportType}-${format(selectedDate, "yyyy-MM-dd")}.pdf`
+                : `money-tracker-report-${reportType}-${format(selectedDate, "yyyy-MM-dd")}.pdf`;
+            }
             
             pdf.save(filename);
 
@@ -477,17 +592,31 @@ export default function ReportDashboard() {
             <Heading size="md" color={textColor}>
               Report Dashboard
             </Heading>
-            <Flex align="center">
-              <Select value={reportType} onChange={handleReportTypeChange} size="sm" width="120px" mr={4}>
+            <Flex align="center" flexWrap="wrap" gap={2}>
+              <Select value={reportType} onChange={handleReportTypeChange} size="sm" width="120px">
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
+                <option value="custom">Custom Range</option>
               </Select>
               <Flex align="center">
-                <Button size="sm" variant="ghost" onClick={navigatePrevious} mr={1}>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={navigatePrevious} 
+                  mr={1}
+                  isDisabled={reportType === "custom"}
+                >
                   <ChevronLeftIcon />
                 </Button>
-                <Text fontSize="sm" fontWeight="500">
+                <Text 
+                  fontSize="sm" 
+                  fontWeight="500"
+                  cursor={reportType === "custom" ? "pointer" : "default"}
+                  onClick={reportType === "custom" ? onOpen : undefined}
+                  _hover={reportType === "custom" ? { textDecoration: "underline" } : {}}
+                  whiteSpace="nowrap"
+                >
                   {getFormattedDateRange()}
                 </Text>
                 <Button
@@ -496,6 +625,7 @@ export default function ReportDashboard() {
                   onClick={navigateNext}
                   ml={1}
                   isDisabled={
+                    reportType === "custom" ||
                     (reportType === "daily" && isToday(selectedDate)) ||
                     (reportType === "weekly" && isThisWeek(selectedDate)) ||
                     (reportType === "monthly" && isThisMonth(selectedDate))
@@ -511,12 +641,12 @@ export default function ReportDashboard() {
                   colorScheme="blue"
                   rightIcon={<ChevronDownIcon />}
                   leftIcon={<DownloadIcon />}
-                  ml={4}
                   isDisabled={loading || transactionsLoading || !reportData}
+                  zIndex={1}
                 >
                   Export PDF
                 </MenuButton>
-                <MenuList>
+                <MenuList zIndex={10}>
                   <MenuItem onClick={handleExportDetailedPDF}>Detailed Table Report</MenuItem>
                   <MenuItem onClick={() => handleExportPDF('standard')}>Standard Report</MenuItem>
                   <MenuItem onClick={() => handleExportPDF('categories')}>Categories Report</MenuItem>
@@ -701,6 +831,42 @@ export default function ReportDashboard() {
           )}
         </CardBody>
       </Card>
+
+      {/* Custom Date Range Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Select Custom Date Range</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <FormControl mb={4}>
+              <FormLabel>From Date</FormLabel>
+              <Input
+                type="date"
+                value={customFromDate}
+                onChange={(e) => setCustomFromDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>To Date</FormLabel>
+              <Input
+                type="date"
+                value={customToDate}
+                onChange={(e) => setCustomToDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                min={customFromDate}
+              />
+            </FormControl>
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" mr={3} onClick={handleCustomDateSubmit}>
+              Apply
+            </Button>
+            <Button onClick={onClose}>Cancel</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }
