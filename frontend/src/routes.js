@@ -39,6 +39,7 @@ var dashRoutes = [
     icon: <StatsIcon color='inherit' />,
     component: Tables,
     layout: "/admin",
+    hidden: true,
   },
   {
     path: "/billing",
@@ -46,6 +47,7 @@ var dashRoutes = [
     icon: <CreditIcon color='inherit' />,
     component: Billing,
     layout: "/admin",
+    hidden: true,
   },
   {
     path: "/categories",
@@ -116,6 +118,7 @@ var dashRoutes = [
     name: "ACCOUNT PAGES",
     category: "account",
     state: "pageCollapse",
+    hidden: true,
     views: [
       {
         path: "/profile",
@@ -131,6 +134,7 @@ var dashRoutes = [
         icon: <DocumentIcon color='inherit' />,
         component: SignIn,
         layout: "/auth",
+        hidden: true,
       },
       {
         path: "/signup",
@@ -138,6 +142,7 @@ var dashRoutes = [
         icon: <RocketIcon color='inherit' />,
         component: SignUp,
         layout: "/auth",
+        hidden: true,
       },
     ],
   },
