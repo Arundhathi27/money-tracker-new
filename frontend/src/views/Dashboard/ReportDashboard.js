@@ -1,94 +1,83 @@
-// Chakra imports
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
-  Button,
   Flex,
-  Grid,
-  SimpleGrid,
-  Select,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  StatArrow,
   Text,
+  Button,
+  Select,
+  Spinner,
   useColorModeValue,
+  useToast,
+  Heading,
   Menu,
   MenuButton,
   MenuList,
   MenuItem,
-  IconButton,
 } from "@chakra-ui/react";
-import { ChevronDownIcon, DownloadIcon } from "@chakra-ui/icons";
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ChevronDownIcon } from "@chakra-ui/icons";
+
 // Custom components
-import Card from "components/Card/Card.js";
-import CardHeader from "components/Card/CardHeader.js";
-import CardBody from "components/Card/CardBody.js";
-import IconBox from "components/Icons/IconBox";
-// Chart components
+import Card from "components/Card/Card";
+import CardHeader from "components/Card/CardHeader";
+import CardBody from "components/Card/CardBody";
 import LineChart from "components/Charts/LineChart";
 import PieChart from "components/Charts/PieChart";
-import ApexLineChart from "components/Charts/ApexLineChart";
-import ApexPieChart from "components/Charts/ApexPieChart";
-// Custom icons
-import {
-  CartIcon,
-  WalletIcon,
-  StatsIcon,
-} from "components/Icons/Icons.js";
-import React, { useState, useEffect, useRef } from "react";
-// PDF export
+
+// PDF Export
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-// Date handling
-import { format, startOfWeek, endOfWeek, addDays, subDays, subWeeks, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { exportToPDF } from "utils/exportUtils";
 
-// Mock data for demonstration
-const mockTransactions = [
-  { id: 1, date: "2025-10-01", amount: 1200, type: "income", category: "Salary" },
-  { id: 2, date: "2025-10-02", amount: -45, type: "expense", category: "Groceries" },
-  { id: 3, date: "2025-10-03", amount: -25, type: "expense", category: "Transportation" },
-  { id: 4, date: "2025-10-04", amount: -120, type: "expense", category: "Utilities" },
-  { id: 5, date: "2025-10-05", amount: -60, type: "expense", category: "Dining" },
-  { id: 6, date: "2025-09-25", amount: 500, type: "income", category: "Freelance" },
-  { id: 7, date: "2025-09-26", amount: -35, type: "expense", category: "Entertainment" },
-  { id: 8, date: "2025-09-27", amount: -80, type: "expense", category: "Shopping" },
-  { id: 9, date: "2025-09-28", amount: -40, type: "expense", category: "Groceries" },
-  { id: 10, date: "2025-09-29", amount: -30, type: "expense", category: "Transportation" },
-  { id: 11, date: "2025-09-15", amount: 1200, type: "income", category: "Salary" },
-  { id: 12, date: "2025-09-16", amount: -200, type: "expense", category: "Rent" },
-  { id: 13, date: "2025-09-17", amount: -50, type: "expense", category: "Groceries" },
-  { id: 14, date: "2025-09-18", amount: -25, type: "expense", category: "Transportation" },
-  { id: 15, date: "2025-09-19", amount: -45, type: "expense", category: "Dining" },
-];
+// Date handling
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  subDays,
+  subWeeks,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  isToday,
+  isThisWeek,
+  isThisMonth,
+  startOfDay,
+  endOfDay,
+  addWeeks,
+  addMonths,
+  parseISO,
+} from "date-fns";
+
+// Context
+import { useTransactions } from "contexts/TransactionContext";
 
 export default function ReportDashboard() {
-  // Chakra Color Mode
-  const iconBlue = useColorModeValue("blue.500", "blue.500");
-  const iconBoxInside = useColorModeValue("white", "white");
-  const textColor = useColorModeValue("gray.700", "white");
-  const bgCard = useColorModeValue("white", "navy.700");
-  const borderColor = useColorModeValue("gray.200", "gray.600");
-  
-  // State for report type and date
+  const reportRef = useRef(); // ✅ single ref used throughout
+  const toast = useToast();
+  const { transactions, isLoading: transactionsLoading } = useTransactions();
+
+  // States
   const [reportType, setReportType] = useState("daily");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [reportData, setReportData] = useState({
-    income: 0,
-    expenses: 0,
-    netBalance: 0,
-    categories: {},
-    trend: 0,
-    chartData: {
-      income: [],
-      expense: []
+  const [loading, setLoading] = useState(false);
+  const [reportData, setReportData] = useState(null);
+  const categoryChartRef = useRef(null);
+
+  // Colors
+  const textColor = useColorModeValue("gray.700", "white");
+  const iconBlue = useColorModeValue("blue.500", "blue.400");
+  const bgCard = useColorModeValue("white", "navy.700");
+  const borderColor = useColorModeValue("gray.200", "gray.600");
+
+  // Process report data whenever filters change
+  useEffect(() => {
+    if (transactions && transactions.length > 0) {
+      processReportData();
     }
-  });
-  
-  // Ref for the report container (for PDF export)
-  const reportRef = useRef(null);
-  
-  // Format date based on report type
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportType, selectedDate, transactions]);
+
   const getFormattedDateRange = () => {
     if (reportType === "daily") {
       return format(selectedDate, "MM/dd/yyyy");
@@ -100,553 +89,640 @@ export default function ReportDashboard() {
       return format(selectedDate, "MMMM yyyy");
     }
   };
-  
-  // Filter transactions based on report type and selected date
+
   const filterTransactions = () => {
-    let filtered = [];
-    
+    if (!transactions) return [];
+    let filteredTransactions = [];
+
     if (reportType === "daily") {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-      filtered = mockTransactions.filter(t => t.date === dateStr);
+      const dayStart = startOfDay(selectedDate);
+      const dayEnd = endOfDay(selectedDate);
+      filteredTransactions = transactions.filter((transaction) => {
+        const transactionDate = parseISO(transaction.date);
+        return transactionDate >= dayStart && transactionDate <= dayEnd;
+      });
     } else if (reportType === "weekly") {
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
-      filtered = mockTransactions.filter(t => {
-        const date = new Date(t.date);
-        return date >= weekStart && date <= weekEnd;
+      const weekStart = startOfWeek(selectedDate);
+      const weekEnd = endOfWeek(selectedDate);
+      filteredTransactions = transactions.filter((transaction) => {
+        const transactionDate = parseISO(transaction.date);
+        return transactionDate >= weekStart && transactionDate <= weekEnd;
       });
     } else {
       const monthStart = startOfMonth(selectedDate);
       const monthEnd = endOfMonth(selectedDate);
-      filtered = mockTransactions.filter(t => {
-        const date = new Date(t.date);
-        return date >= monthStart && date <= monthEnd;
+      filteredTransactions = transactions.filter((transaction) => {
+        const transactionDate = parseISO(transaction.date);
+        return transactionDate >= monthStart && transactionDate <= monthEnd;
       });
     }
-    
-    return filtered;
+
+    return filteredTransactions;
   };
-  
-  // Calculate previous period for comparison
+
   const getPreviousPeriodTransactions = () => {
-    let previousDate;
-    
+    if (!transactions) return [];
+    let previousPeriodStart, previousPeriodEnd;
+
     if (reportType === "daily") {
-      previousDate = subDays(selectedDate, 1);
+      const prevDay = subDays(selectedDate, 1);
+      previousPeriodStart = startOfDay(prevDay);
+      previousPeriodEnd = endOfDay(prevDay);
     } else if (reportType === "weekly") {
-      previousDate = subWeeks(selectedDate, 1);
+      const prevWeekStart = subWeeks(startOfWeek(selectedDate), 1);
+      const prevWeekEnd = endOfWeek(prevWeekStart);
+      previousPeriodStart = prevWeekStart;
+      previousPeriodEnd = prevWeekEnd;
     } else {
-      previousDate = subMonths(selectedDate, 1);
+      const prevMonthStart = subMonths(startOfMonth(selectedDate), 1);
+      const prevMonthEnd = endOfMonth(prevMonthStart);
+      previousPeriodStart = prevMonthStart;
+      previousPeriodEnd = prevMonthEnd;
     }
-    
-    let filtered = [];
-    
-    if (reportType === "daily") {
-      const dateStr = format(previousDate, "yyyy-MM-dd");
-      filtered = mockTransactions.filter(t => t.date === dateStr);
-    } else if (reportType === "weekly") {
-      const weekStart = startOfWeek(previousDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(previousDate, { weekStartsOn: 1 });
-      filtered = mockTransactions.filter(t => {
-        const date = new Date(t.date);
-        return date >= weekStart && date <= weekEnd;
-      });
-    } else {
-      const monthStart = startOfMonth(previousDate);
-      const monthEnd = endOfMonth(previousDate);
-      filtered = mockTransactions.filter(t => {
-        const date = new Date(t.date);
-        return date >= monthStart && date <= monthEnd;
-      });
-    }
-    
-    return filtered;
-  };
-  
-  // Process data for the report
-  const processReportData = () => {
-    const transactions = filterTransactions();
-    const previousTransactions = getPreviousPeriodTransactions();
-    
-    // Calculate totals
-    const income = transactions
-      .filter(t => t.type === "income")
-      .reduce((sum, t) => sum + t.amount, 0);
-      
-    const expenses = transactions
-      .filter(t => t.type === "expense")
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      
-    const netBalance = income - expenses;
-    
-    // Calculate previous period totals
-    const prevIncome = previousTransactions
-      .filter(t => t.type === "income")
-      .reduce((sum, t) => sum + t.amount, 0);
-      
-    const prevExpenses = previousTransactions
-      .filter(t => t.type === "expense")
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    
-    // Calculate trend (percentage change)
-    const expenseTrend = prevExpenses === 0 ? 0 : ((expenses - prevExpenses) / prevExpenses) * 100;
-    
-    // Process categories
-    const categories = {};
-    transactions
-      .filter(t => t.type === "expense")
-      .forEach(t => {
-        if (!categories[t.category]) {
-          categories[t.category] = 0;
-        }
-        categories[t.category] += Math.abs(t.amount);
-      });
-    
-    // Prepare chart data
-    const chartData = {
-      income: [],
-      expense: []
-    };
-    
-    if (reportType === "daily") {
-      // For daily, show hourly breakdown (mock data)
-      for (let i = 0; i < 24; i++) {
-        chartData.income.push({
-          x: `${i}:00`,
-          y: Math.random() * 100 * (i % 3 === 0 ? 1 : 0.2)
-        });
-        chartData.expense.push({
-          x: `${i}:00`,
-          y: Math.random() * 50
-        });
-      }
-    } else if (reportType === "weekly") {
-      // For weekly, show daily breakdown
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
-      for (let i = 0; i < 7; i++) {
-        const day = addDays(weekStart, i);
-        const dayStr = format(day, "yyyy-MM-dd");
-        const dayIncome = transactions
-          .filter(t => t.date === dayStr && t.type === "income")
-          .reduce((sum, t) => sum + t.amount, 0);
-        const dayExpense = transactions
-          .filter(t => t.date === dayStr && t.type === "expense")
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-          
-        chartData.income.push({
-          x: format(day, "EEE"),
-          y: dayIncome
-        });
-        chartData.expense.push({
-          x: format(day, "EEE"),
-          y: dayExpense
-        });
-      }
-    } else {
-      // For monthly, show weekly breakdown
-      const monthStart = startOfMonth(selectedDate);
-      const monthEnd = endOfMonth(selectedDate);
-      let currentWeekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-      
-      while (currentWeekStart <= monthEnd) {
-        const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-        const weekIncome = transactions
-          .filter(t => {
-            const date = new Date(t.date);
-            return date >= currentWeekStart && date <= weekEnd && t.type === "income";
-          })
-          .reduce((sum, t) => sum + t.amount, 0);
-          
-        const weekExpense = transactions
-          .filter(t => {
-            const date = new Date(t.date);
-            return date >= currentWeekStart && date <= weekEnd && t.type === "expense";
-          })
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-          
-        chartData.income.push({
-          x: `W${format(currentWeekStart, "w")}`,
-          y: weekIncome
-        });
-        chartData.expense.push({
-          x: `W${format(currentWeekStart, "w")}`,
-          y: weekExpense
-        });
-        
-        currentWeekStart = addDays(currentWeekStart, 7);
-      }
-    }
-    
-    setReportData({
-      income,
-      expenses,
-      netBalance,
-      categories,
-      trend: expenseTrend,
-      chartData
+
+    return transactions.filter((transaction) => {
+      const transactionDate = parseISO(transaction.date);
+      return transactionDate >= previousPeriodStart && transactionDate <= previousPeriodEnd;
     });
   };
-  
-  // Handle report type change
+
+  const processReportData = () => {
+    try {
+      setLoading(true);
+
+      const filteredTransactions = filterTransactions();
+      const previousPeriodTransactions = getPreviousPeriodTransactions();
+
+      let income = 0;
+      let expenses = 0;
+      let previousIncome = 0;
+      let previousExpenses = 0;
+
+      // Process category data
+      const categoryTotals = {};
+      filteredTransactions.forEach((transaction) => {
+        const category = (transaction.category || "Others").toLowerCase();
+        const amount = parseFloat(transaction.amount) || 0;
+        
+        if (!categoryTotals[category]) {
+          categoryTotals[category] = { income: 0, expenses: 0 };
+        }
+        
+        if (transaction.type === "income") {
+          categoryTotals[category].income += amount;
+          income += amount;
+        } else {
+          categoryTotals[category].expenses += amount;
+          expenses += amount;
+        }
+      });
+
+      previousPeriodTransactions.forEach((transaction) => {
+        if (transaction.type === "income") {
+          previousIncome += parseFloat(transaction.amount);
+        } else {
+          previousExpenses += parseFloat(transaction.amount);
+        }
+      });
+
+      const netBalance = income - expenses;
+      const previousNetBalance = previousIncome - previousExpenses;
+
+      const incomeChange = previousIncome === 0 ? 100 : ((income - previousIncome) / previousIncome) * 100;
+      const expensesChange = previousExpenses === 0 ? 100 : ((expenses - previousExpenses) / previousExpenses) * 100;
+      const netBalanceChange = previousNetBalance === 0 ? 100 : ((netBalance - previousNetBalance) / Math.abs(previousNetBalance)) * 100;
+      
+      // Generate category chart data
+      const categoryLabels = Object.keys(categoryTotals).map(
+        cat => cat.charAt(0).toUpperCase() + cat.slice(1)
+      );
+      const categoryExpenses = Object.values(categoryTotals).map(val => val.expenses);
+      const categoryIncome = Object.values(categoryTotals).map(val => val.income);
+      
+      // Generate colors for categories
+      const generateColor = (index) => {
+        const hue = (index * 47) % 360; // 47° step gives good variety
+        return `hsl(${hue}, 65%, 55%)`;
+      };
+      
+      const categoryColors = categoryLabels.map((_, i) => generateColor(i));
+
+      let chartData = [];
+      let chartLabels = [];
+      let incomeData = [];
+      let expenseData = [];
+
+      if (reportType === "daily") {
+        for (let hour = 0; hour < 24; hour++) {
+          const hourStart = new Date(selectedDate);
+          hourStart.setHours(hour, 0, 0, 0);
+          const hourEnd = new Date(selectedDate);
+          hourEnd.setHours(hour, 59, 59, 999);
+          const hourlyTransactions = filteredTransactions.filter((t) => {
+            const d = parseISO(t.date);
+            return d >= hourStart && d <= hourEnd;
+          });
+          let hourlyIncome = 0;
+          let hourlyExpense = 0;
+          hourlyTransactions.forEach((t) => {
+            if (t.type === "income") hourlyIncome += parseFloat(t.amount);
+            else hourlyExpense += parseFloat(t.amount);
+          });
+          chartLabels.push(`${hour}:00`);
+          incomeData.push(hourlyIncome);
+          expenseData.push(hourlyExpense);
+        }
+      } else if (reportType === "weekly") {
+        const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+        for (let day = 0; day < 7; day++) {
+          const dayDate = addDays(weekStart, day);
+          const dayStart = startOfDay(dayDate);
+          const dayEnd = endOfDay(dayDate);
+          const dailyTransactions = filteredTransactions.filter((t) => {
+            const d = parseISO(t.date);
+            return d >= dayStart && d <= dayEnd;
+          });
+          let dailyIncome = 0;
+          let dailyExpense = 0;
+          dailyTransactions.forEach((t) => {
+            if (t.type === "income") dailyIncome += parseFloat(t.amount);
+            else dailyExpense += parseFloat(t.amount);
+          });
+          chartLabels.push(format(dayDate, "EEE"));
+          incomeData.push(dailyIncome);
+          expenseData.push(dailyExpense);
+        }
+      } else {
+        const monthStart = startOfMonth(selectedDate);
+        const monthEnd = endOfMonth(selectedDate);
+        const totalWeeks = Math.ceil((monthEnd.getDate() - monthStart.getDate() + 1) / 7);
+        for (let week = 0; week < totalWeeks; week++) {
+          const weekStart = addDays(monthStart, week * 7);
+          const weekEnd = new Date(Math.min(addDays(weekStart, 6).getTime(), monthEnd.getTime()));
+          const weeklyTransactions = filteredTransactions.filter((t) => {
+            const d = parseISO(t.date);
+            return d >= weekStart && d <= weekEnd;
+          });
+          let weeklyIncome = 0;
+          let weeklyExpense = 0;
+          weeklyTransactions.forEach((t) => {
+            if (t.type === "income") weeklyIncome += parseFloat(t.amount);
+            else weeklyExpense += parseFloat(t.amount);
+          });
+          chartLabels.push(`Week ${week + 1}`);
+          incomeData.push(weeklyIncome);
+          expenseData.push(weeklyExpense);
+        }
+      }
+
+      chartData = [
+        { name: "Income", data: incomeData, color: "#4299E1" },
+        { name: "Expenses", data: expenseData, color: "#F56565" },
+      ];
+
+      const chartOptions = {
+        chart: { toolbar: { show: false } },
+        colors: ["#4299E1", "#F56565"],
+        stroke: { curve: "smooth" },
+        xaxis: { categories: chartLabels },
+        yaxis: {
+          labels: {
+            formatter: (v) => `$${v.toFixed(0)}`,
+          },
+        },
+      };
+
+      setReportData({
+        income,
+        expenses,
+        netBalance,
+        incomeChange,
+        expensesChange,
+        netBalanceChange,
+        chartData,
+        chartOptions,
+        categoryData: {
+          labels: categoryLabels,
+          expenses: categoryExpenses,
+          income: categoryIncome,
+          colors: categoryColors,
+          totals: categoryTotals
+        }
+      });
+    } catch (error) {
+      console.error("Error processing report data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process report data",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReportTypeChange = (e) => {
     setReportType(e.target.value);
+    setSelectedDate(new Date());
   };
-  
-  // Handle date navigation
-  const handlePrevDate = () => {
-    if (reportType === "daily") {
-      setSelectedDate(subDays(selectedDate, 1));
-    } else if (reportType === "weekly") {
-      setSelectedDate(subWeeks(selectedDate, 1));
-    } else {
-      setSelectedDate(subMonths(selectedDate, 1));
-    }
+
+  const navigatePrevious = () => {
+    if (reportType === "daily") setSelectedDate(subDays(selectedDate, 1));
+    else if (reportType === "weekly") setSelectedDate(subWeeks(selectedDate, 1));
+    else setSelectedDate(subMonths(selectedDate, 1));
   };
-  
-  const handleNextDate = () => {
-    if (reportType === "daily") {
-      setSelectedDate(addDays(selectedDate, 1));
-    } else if (reportType === "weekly") {
-      setSelectedDate(addDays(selectedDate, 7));
-    } else {
-      setSelectedDate(addDays(selectedDate, 30));
-    }
+
+  const navigateNext = () => {
+    if (reportType === "daily") setSelectedDate(addDays(selectedDate, 1));
+    else if (reportType === "weekly") setSelectedDate(addWeeks(selectedDate, 1));
+    else setSelectedDate(addMonths(selectedDate, 1));
   };
-  
-  // Handle PDF export
-  const handleExportPDF = () => {
-    if (reportRef.current) {
-      html2canvas(reportRef.current, { scale: 2 }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-        const imgX = (pdfWidth - imgWidth * ratio) / 2;
-        const imgY = 30;
-        
-        // Add title
-        pdf.setFontSize(18);
-        pdf.text(`Money Tracker Report - ${getFormattedDateRange()}`, pdfWidth / 2, 20, { align: 'center' });
-        
-        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-        pdf.save(`money-tracker-report-${reportType}-${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
+
+  const handleExportDetailedPDF = () => {
+    try {
+      const filtered = filterTransactions();
+      if (!filtered || filtered.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No transactions available for this period",
+          status: "warning",
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      setLoading(true);
+      const title = "Money Tracker Detailed Report";
+      const subtitle = `Period: ${getFormattedDateRange()}  •  View: ${reportType.charAt(0).toUpperCase()}${reportType.slice(1)}`;
+      const filename = `money-tracker-detailed-${reportType}-${format(selectedDate, "yyyy-MM-dd")}`;
+
+      exportToPDF(filtered, filename, { title, subtitle });
+
+      toast({
+        title: "PDF Exported",
+        description: "Detailed report has been exported successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
       });
+    } catch (error) {
+      console.error("Error exporting detailed PDF:", error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error exporting the detailed PDF.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setLoading(false);
     }
   };
-  
-  // Process data when report type or date changes
-  useEffect(() => {
-    processReportData();
-  }, [reportType, selectedDate]);
-  
-  // Prepare chart options and data
-  const lineChartOptions = {
-    chart: {
-      toolbar: {
-        show: false,
-      },
-      dropShadow: {
-        enabled: true,
-        top: 13,
-        left: 0,
-        blur: 10,
-        opacity: 0.1,
-        color: "#4318FF",
-      },
-    },
-    colors: ["#4318FF", "#39B8FF"],
-    markers: {
-      size: 0,
-      colors: "white",
-      strokeColors: "#7551FF",
-      strokeWidth: 3,
-      strokeOpacity: 0.9,
-      strokeDashArray: 0,
-      fillOpacity: 1,
-      discrete: [],
-      shape: "circle",
-      radius: 2,
-      offsetX: 0,
-      offsetY: 0,
-      showNullDataPoints: true,
-    },
-    tooltip: {
-      theme: "dark",
-    },
-    dataLabels: {
-      enabled: false,
-    },
-    stroke: {
-      curve: "smooth",
-      type: "line",
-    },
-    xaxis: {
-      type: "category",
-      categories: reportData.chartData.income.map(item => item.x),
-      labels: {
-        style: {
-          colors: "#A3AED0",
-          fontSize: "12px",
-          fontWeight: "500",
-        },
-      },
-      axisBorder: {
-        show: false,
-      },
-      axisTicks: {
-        show: false,
-      },
-    },
-    yaxis: {
-      show: true,
-    },
-    legend: {
-      show: true,
-    },
-    grid: {
-      show: false,
-      column: {
-        color: ["#7551FF", "#39B8FF"],
-        opacity: 0.5,
-      },
-    },
+
+  const handleExportPDF = (exportType = 'standard') => {
+    if (reportRef.current) {
+      try {
+        setLoading(true);
+        toast({
+          title: "Exporting PDF",
+          description: "Please wait while we generate your report...",
+          status: "info",
+          duration: 2000,
+          isClosable: true,
+        });
+        
+        setTimeout(() => {
+          const targetRef = exportType === 'categories' && categoryChartRef.current 
+            ? categoryChartRef.current 
+            : reportRef.current;
+          
+          html2canvas(targetRef, { 
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            logging: false
+          }).then((canvas) => {
+            const imgData = canvas.toDataURL("image/png");
+            const pdf = new jsPDF("p", "mm", "a4");
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            const imgX = (pdfWidth - imgWidth * ratio) / 2;
+            const imgY = 30;
+
+            pdf.setFontSize(18);
+            const title = exportType === 'categories' 
+              ? `Money Tracker Category Report - ${getFormattedDateRange()}` 
+              : `Money Tracker Report - ${getFormattedDateRange()}`;
+            
+            pdf.text(title, pdfWidth / 2, 20, { align: "center" });
+            pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+            
+            const filename = exportType === 'categories'
+              ? `money-tracker-category-report-${reportType}-${format(selectedDate, "yyyy-MM-dd")}.pdf`
+              : `money-tracker-report-${reportType}-${format(selectedDate, "yyyy-MM-dd")}.pdf`;
+            
+            pdf.save(filename);
+
+            setLoading(false);
+            toast({
+              title: "PDF Exported",
+              description: "Report has been exported successfully",
+              status: "success",
+              duration: 3000,
+              isClosable: true,
+            });
+          }).catch(error => {
+            console.error("Error generating PDF:", error);
+            setLoading(false);
+            toast({
+              title: "Export Failed",
+              description: "There was an error exporting the PDF. Please try again.",
+              status: "error",
+              duration: 3000,
+              isClosable: true,
+            });
+          });
+        }, 500);
+      } catch (error) {
+        console.error("Error in PDF export:", error);
+        setLoading(false);
+        toast({
+          title: "Export Failed",
+          description: "There was an error exporting the PDF. Please try again.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    }
   };
-  
-  const lineChartData = [
-    {
-      name: "Income",
-      data: reportData.chartData.income.map(item => item.y),
-    },
-    {
-      name: "Expenses",
-      data: reportData.chartData.expense.map(item => item.y),
-    },
-  ];
-  
-  // Prepare pie chart data
-  const pieChartData = Object.entries(reportData.categories).map(([category, amount]) => ({
-    name: category,
-    value: amount,
-  }));
-  
+
   return (
     <Box pt={{ base: "130px", md: "80px", xl: "80px" }}>
-      <div ref={reportRef}>
-        {/* Header with report type selector and date navigation */}
-        <Flex mb="20px" justifyContent="space-between" alignItems="center">
-          <Flex alignItems="center">
-            <Text fontSize="xl" fontWeight="bold" mr={4}>
-              Money Tracker Report
-            </Text>
-            <Select 
-              value={reportType} 
-              onChange={handleReportTypeChange} 
-              width="150px"
-              borderRadius="15px"
-              size="sm"
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </Select>
-          </Flex>
-          
-          <Flex alignItems="center">
-            <Button size="sm" onClick={handlePrevDate} mr={2}>
-              Previous
-            </Button>
-            <Text fontWeight="medium" mx={3}>
-              {getFormattedDateRange()}
-            </Text>
-            <Button size="sm" onClick={handleNextDate} ml={2}>
-              Next
-            </Button>
-            <Button 
-              leftIcon={<DownloadIcon />} 
-              colorScheme="blue" 
-              variant="solid" 
-              size="sm" 
-              ml={4}
-              onClick={handleExportPDF}
-            >
-              Export PDF
-            </Button>
-          </Flex>
-        </Flex>
-        
-        {/* Summary Cards */}
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing="20px" mb="20px">
-          {/* Income Card */}
-          <Card>
-            <CardBody>
-              <Flex flexDirection="row" align="center" justify="center" w="100%">
-                <Stat me="auto">
-                  <StatLabel fontSize="sm" color="gray.400" fontWeight="bold" pb="2px">
-                    Total Income
-                  </StatLabel>
-                  <Flex>
-                    <StatNumber fontSize="lg" color={textColor}>
-                      ${reportData.income.toFixed(2)}
-                    </StatNumber>
-                  </Flex>
-                </Stat>
-                <IconBox as="box" h={"45px"} w={"45px"} bg={iconBlue}>
-                  <WalletIcon h={"24px"} w={"24px"} color={iconBoxInside} />
-                </IconBox>
-              </Flex>
-            </CardBody>
-          </Card>
-          
-          {/* Expenses Card */}
-          <Card>
-            <CardBody>
-              <Flex flexDirection="row" align="center" justify="center" w="100%">
-                <Stat me="auto">
-                  <StatLabel fontSize="sm" color="gray.400" fontWeight="bold" pb="2px">
-                    Total Expenses
-                  </StatLabel>
-                  <Flex>
-                    <StatNumber fontSize="lg" color={textColor}>
-                      ${reportData.expenses.toFixed(2)}
-                    </StatNumber>
-                    <StatHelpText
-                      alignSelf="flex-end"
-                      justifySelf="flex-end"
-                      m="0px"
-                      color={reportData.trend > 0 ? "red.500" : "green.500"}
-                      fontWeight="bold"
-                      ps="3px"
-                      fontSize="md"
-                    >
-                      <StatArrow type={reportData.trend > 0 ? "increase" : "decrease"} />
-                      {Math.abs(reportData.trend).toFixed(1)}%
-                    </StatHelpText>
-                  </Flex>
-                </Stat>
-                <IconBox as="box" h={"45px"} w={"45px"} bg="red.500">
-                  <CartIcon h={"24px"} w={"24px"} color={iconBoxInside} />
-                </IconBox>
-              </Flex>
-            </CardBody>
-          </Card>
-          
-          {/* Net Balance Card */}
-          <Card>
-            <CardBody>
-              <Flex flexDirection="row" align="center" justify="center" w="100%">
-                <Stat>
-                  <StatLabel fontSize="sm" color="gray.400" fontWeight="bold" pb="2px">
-                    Net Balance
-                  </StatLabel>
-                  <Flex>
-                    <StatNumber fontSize="lg" color={reportData.netBalance >= 0 ? "green.500" : "red.500"}>
-                      ${reportData.netBalance.toFixed(2)}
-                    </StatNumber>
-                  </Flex>
-                </Stat>
-                <Spacer />
-                <IconBox as="box" h={"45px"} w={"45px"} bg={reportData.netBalance >= 0 ? "green.500" : "red.500"}>
-                  <StatsIcon h={"24px"} w={"24px"} color={iconBoxInside} />
-                </IconBox>
-              </Flex>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
-        
-        {/* Charts */}
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing="20px" mb="20px">
-          {/* Income vs Expenses Trend */}
-          <Card p="28px 10px 16px 0px" mb={{ sm: "26px", lg: "0px" }}>
-            <CardHeader mb="20px" pl="22px">
-              <Flex direction="column" alignSelf="flex-start">
-                <Text fontSize="lg" color={textColor} fontWeight="bold" mb="6px">
-                  Income vs Expenses
-                </Text>
-                <Text fontSize="md" fontWeight="medium" color="gray.400">
-                  {reportType === "daily" ? "Hourly breakdown" : 
-                   reportType === "weekly" ? "Daily breakdown" : "Weekly breakdown"}
-                </Text>
-              </Flex>
-            </CardHeader>
-            <Box w="100%" h={{ sm: "300px" }} ps="8px">
-              <ApexLineChart
-                chartData={lineChartData}
-                chartOptions={lineChartOptions}
-              />
-            </Box>
-          </Card>
-          
-          {/* Category Breakdown */}
-          <Card p="28px 10px 16px 0px" mb={{ sm: "26px", lg: "0px" }}>
-            <CardHeader mb="20px" pl="22px">
-              <Flex direction="column" alignSelf="flex-start">
-                <Text fontSize="lg" color={textColor} fontWeight="bold" mb="6px">
-                  Spending by Category
-                </Text>
-                <Text fontSize="md" fontWeight="medium" color="gray.400">
+      <Card ref={reportRef}>
+        <CardHeader mb="12px">
+          <Flex
+            direction={{ base: "column", md: "row" }}
+            justify="space-between"
+            align={{ base: "start", md: "center" }}
+            flexWrap="wrap"
+            gap={3}
+          >
+            <Heading size="md" color={textColor}>
+              Report Dashboard
+            </Heading>
+            <Flex align="center">
+              <Select value={reportType} onChange={handleReportTypeChange} size="sm" width="120px" mr={4}>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </Select>
+              <Flex align="center">
+                <Button size="sm" variant="ghost" onClick={navigatePrevious} mr={1}>
+                  <ChevronLeftIcon />
+                </Button>
+                <Text fontSize="sm" fontWeight="500">
                   {getFormattedDateRange()}
                 </Text>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={navigateNext}
+                  ml={1}
+                  isDisabled={
+                    (reportType === "daily" && isToday(selectedDate)) ||
+                    (reportType === "weekly" && isThisWeek(selectedDate)) ||
+                    (reportType === "monthly" && isThisMonth(selectedDate))
+                  }
+                >
+                  <ChevronRightIcon />
+                </Button>
               </Flex>
-            </CardHeader>
-            <Box w="100%" h={{ sm: "300px" }} ps="8px">
-              <ApexPieChart
-                chartData={pieChartData}
-              />
-            </Box>
-          </Card>
-        </SimpleGrid>
-        
-        {/* Top Spending Categories */}
-        <Card p="16px" mb="20px">
-          <CardHeader p="12px 5px" mb="12px">
-            <Text fontSize="lg" color={textColor} fontWeight="bold">
-              Top Spending Categories
-            </Text>
-          </CardHeader>
-          <CardBody px="5px">
-            <Flex direction="column">
-              {Object.entries(reportData.categories)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5)
-                .map(([category, amount], index) => (
-                  <Flex key={index} justify="space-between" mb="20px">
-                    <Flex align="center">
-                      <Box
-                        w="15px"
-                        h="15px"
-                        bg={
-                          index === 0
-                            ? "blue.500"
-                            : index === 1
-                            ? "green.500"
-                            : index === 2
-                            ? "orange.500"
-                            : index === 3
-                            ? "purple.500"
-                            : "red.500"
-                        }
-                        borderRadius="50%"
-                        me="12px"
-                      />
-                      <Text fontSize="md" color={textColor} fontWeight="bold">
-                        {category}
-                      </Text>
-                    </Flex>
-                    <Text fontSize="md" color={textColor} fontWeight="bold">
-                      ${amount.toFixed(2)}
-                    </Text>
-                  </Flex>
-                ))}
+              <Menu>
+                <MenuButton
+                  as={Button}
+                  size="sm"
+                  colorScheme="blue"
+                  rightIcon={<ChevronDownIcon />}
+                  leftIcon={<DownloadIcon />}
+                  ml={4}
+                  isDisabled={loading || transactionsLoading || !reportData}
+                >
+                  Export PDF
+                </MenuButton>
+                <MenuList>
+                  <MenuItem onClick={handleExportDetailedPDF}>Detailed Table Report</MenuItem>
+                  <MenuItem onClick={() => handleExportPDF('standard')}>Standard Report</MenuItem>
+                  <MenuItem onClick={() => handleExportPDF('categories')}>Categories Report</MenuItem>
+                </MenuList>
+              </Menu>
             </Flex>
-          </CardBody>
-        </Card>
-      </div>
+          </Flex>
+        </CardHeader>
+
+        <CardBody>
+          {loading || transactionsLoading ? (
+            <Flex justify="center" align="center" height="300px">
+              <Spinner size="xl" color={iconBlue} />
+            </Flex>
+          ) : !reportData ? (
+            <Flex justify="center" align="center" height="300px">
+              <Text>No transaction data available</Text>
+            </Flex>
+          ) : (
+            <>
+              {/* Summary Cards */}
+              <Flex direction={{ base: "column", md: "row" }} gap={4} mb={6} justify="space-between">
+                {/* Income Card */}
+                <SummaryCard
+                  title="Total Income"
+                  amount={reportData.income}
+                  change={reportData.incomeChange}
+                  color="blue.500"
+                  icon="fas fa-dollar-sign"
+                  textColor={textColor}
+                  borderColor={borderColor}
+                  bgCard={bgCard}
+                />
+                {/* Expenses Card */}
+                <SummaryCard
+                  title="Total Expenses"
+                  amount={reportData.expenses}
+                  change={reportData.expensesChange}
+                  color="red.500"
+                  icon="fas fa-credit-card"
+                  textColor={textColor}
+                  borderColor={borderColor}
+                  bgCard={bgCard}
+                />
+                {/* Net Balance Card */}
+                <SummaryCard
+                  title="Net Balance"
+                  amount={reportData.netBalance}
+                  change={reportData.netBalanceChange}
+                  color={reportData.netBalance >= 0 ? "green.500" : "red.500"}
+                  icon="fas fa-wallet"
+                  textColor={textColor}
+                  borderColor={borderColor}
+                  bgCard={bgCard}
+                />
+              </Flex>
+
+              {/* Chart */}
+              <Box height="400px" bg={bgCard} p={4} borderRadius="lg" boxShadow="sm" border="1px" borderColor={borderColor}>
+                <Text mb={4} fontWeight="medium" fontSize="md">
+                  Income vs Expenses
+                </Text>
+                <Box height="350px">
+                  <LineChart chartData={reportData.chartData} chartOptions={reportData.chartOptions} />
+                </Box>
+              </Box>
+              
+              {/* Category Chart - Hidden by default, only used for PDF export */}
+              <Box 
+                ref={categoryChartRef} 
+                mt={8} 
+                p={4} 
+                bg={bgCard} 
+                borderRadius="lg" 
+                boxShadow="sm" 
+                border="1px" 
+                borderColor={borderColor}
+                style={{ display: 'none' }}
+              >
+                <Flex direction="column" mb={4}>
+                  <Text color={textColor} fontSize="lg" fontWeight="bold" mb={2}>
+                    Transaction Distribution by Category
+                  </Text>
+                  <Text color="gray.400" fontSize="sm">
+                    Period: {getFormattedDateRange()}
+                  </Text>
+                </Flex>
+                
+                {reportData.categoryData && reportData.categoryData.labels.length > 0 ? (
+                  <Box h="400px">
+                    <PieChart
+                      chartData={reportData.categoryData.expenses}
+                      chartOptions={{
+                        chart: { type: "pie", background: "transparent" },
+                        labels: reportData.categoryData.labels,
+                        colors: reportData.categoryData.colors,
+                        legend: {
+                          position: "bottom",
+                          labels: { colors: textColor }
+                        },
+                        dataLabels: {
+                          enabled: true,
+                          style: { colors: ["#fff"], fontSize: "12px", fontWeight: "bold" },
+                          formatter: (val, opts) => {
+                            const value = opts.w.config.series[opts.seriesIndex];
+                            return "$" + value.toFixed(0);
+                          },
+                        },
+                        plotOptions: {
+                          pie: {
+                            expandOnClick: true,
+                            donut: { size: "0%" },
+                          },
+                        },
+                        tooltip: {
+                          y: { formatter: (val) => "$" + val.toFixed(2) },
+                        },
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Flex align="center" justify="center" h="400px">
+                    <Text color="gray.400">No category data available</Text>
+                  </Flex>
+                )}
+                
+                {/* Category Breakdown Table */}
+                {reportData.categoryData && reportData.categoryData.labels.length > 0 && (
+                  <Box mt={6}>
+                    <Text color={textColor} fontSize="md" fontWeight="bold" mb={3}>
+                      Category Breakdown
+                    </Text>
+                    <Flex 
+                      direction="column" 
+                      border="1px" 
+                      borderColor={borderColor} 
+                      borderRadius="md"
+                    >
+                      <Flex 
+                        bg={useColorModeValue("gray.50", "gray.700")} 
+                        p={3} 
+                        borderBottom="1px" 
+                        borderColor={borderColor}
+                      >
+                        <Text flex="1" fontWeight="bold">Category</Text>
+                        <Text flex="1" fontWeight="bold" textAlign="right">Income</Text>
+                        <Text flex="1" fontWeight="bold" textAlign="right">Expenses</Text>
+                        <Text flex="1" fontWeight="bold" textAlign="right">Net</Text>
+                      </Flex>
+                      
+                      {reportData.categoryData.labels.map((label, index) => {
+                        const income = reportData.categoryData.income[index];
+                        const expenses = reportData.categoryData.expenses[index];
+                        const net = income - expenses;
+                        
+                        return (
+                          <Flex 
+                            key={label} 
+                            p={3} 
+                            borderBottom="1px" 
+                            borderColor={borderColor}
+                            _last={{ borderBottom: "none" }}
+                          >
+                            <Text flex="1">{label}</Text>
+                            <Text flex="1" textAlign="right" color="green.500">${income.toFixed(2)}</Text>
+                            <Text flex="1" textAlign="right" color="red.500">${expenses.toFixed(2)}</Text>
+                            <Text 
+                              flex="1" 
+                              textAlign="right" 
+                              color={net >= 0 ? "green.500" : "red.500"}
+                            >
+                              ${net.toFixed(2)}
+                            </Text>
+                          </Flex>
+                        );
+                      })}
+                    </Flex>
+                  </Box>
+                )}
+              </Box>
+            </>
+          )}
+        </CardBody>
+      </Card>
     </Box>
   );
 }
 
-// Helper component for spacing
-const Spacer = () => <Box flex="1" />;
+const SummaryCard = ({ title, amount, change, color, icon, textColor, borderColor, bgCard }) => (
+  <Box p={4} bg={bgCard} borderRadius="lg" boxShadow="sm" border="1px" borderColor={borderColor} flex="1">
+    <Flex justify="space-between" align="center" mb={2}>
+      <Text fontSize="sm" color="gray.500">
+        {title}
+      </Text>
+      <Box bg={`${color.replace(".500", ".50")}`} p={2} borderRadius="full">
+        <Box as="span" color={color} fontSize="lg">
+          <i className={icon}></i>
+        </Box>
+      </Box>
+    </Flex>
+    <Text fontSize="2xl" fontWeight="bold" color={textColor}>
+      ${amount.toFixed(2)}
+    </Text>
+    <Text fontSize="sm" color={change >= 0 ? "green.500" : "red.500"}>
+      {change >= 0 ? "+" : ""}
+      {change.toFixed(1)}% from previous period
+    </Text>
+  </Box>
+);

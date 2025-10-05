@@ -59,18 +59,24 @@ export const exportToExcel = (transactions, filename = 'expense_categories') => 
  * @param {Array} transactions - Array of transaction objects
  * @param {string} filename - Name of the exported file (without extension)
  */
-export const exportToPDF = (transactions, filename = 'expense_categories') => {
+export const exportToPDF = (transactions, filename = 'expense_categories', options = {}) => {
   try {
     // Create new PDF document
     const pdf = new jsPDF();
 
     // Add title
     pdf.setFontSize(20);
-    pdf.text('Expense Categories Report', 20, 30);
+    const title = options.title || 'Expense Categories Report';
+    pdf.text(title, 20, 30);
 
     // Add report generation date
     pdf.setFontSize(10);
-    pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 40);
+    if (options.subtitle) {
+      pdf.text(options.subtitle, 20, 38);
+      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 46);
+    } else {
+      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 40);
+    }
 
     // Prepare table data
     const tableData = transactions.map(transaction => [
@@ -110,7 +116,7 @@ export const exportToPDF = (transactions, filename = 'expense_categories') => {
     autoTable(pdf, {
       columns: columns,
       body: tableData,
-      startY: 80,
+      startY: options.subtitle ? 86 : 80,
       styles: {
         fontSize: 8,
         cellPadding: 3,
@@ -124,7 +130,7 @@ export const exportToPDF = (transactions, filename = 'expense_categories') => {
       alternateRowStyles: {
         fillColor: [245, 245, 245], // Light gray for alternate rows
       },
-      margin: { top: 80 },
+      margin: { top: options.subtitle ? 86 : 80 },
     });
 
     // Save PDF
