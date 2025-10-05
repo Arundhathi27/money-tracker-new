@@ -12,6 +12,7 @@ import Budgets from "views/Dashboard/Budgets.js";
 import CurrencyConverter from "views/Dashboard/CurrencyConverter.js";
 import ExpenseCalendar from "views/Dashboard/ExpenseCalendar.js";
 import GroupManager from "views/Dashboard/GroupManager.js";
+import ReportDashboard from "views/Dashboard/ReportDashboard.js";
 import SignIn from "views/Pages/SignIn.js";
 import SignUp from "views/Pages/SignUp.js";
 
@@ -93,6 +94,13 @@ var dashRoutes = [
     name: "Group Expenses",
     icon: <PersonIcon color='inherit' />,
     component: GroupManager,
+    layout: "/admin",
+  },
+  {
+    path: "/report-dashboard",
+    name: "Report Dashboard",
+    icon: <StatsIcon color='inherit' />,
+    component: ReportDashboard,
     layout: "/admin",
   },
   // Hidden route - not shown in sidebar but accessible via direct URL
