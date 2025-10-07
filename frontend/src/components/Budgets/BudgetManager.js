@@ -85,7 +85,7 @@ const BudgetManager = ({ budgets, isLoading, onBudgetUpdate }) => {
         title: "Delete Failed",
         description: "Failed to delete budget. Please try again.",
         status: "error",
-        duration: 5000,
+        duration: 5001,
         isClosable: true,
       });
     } finally {

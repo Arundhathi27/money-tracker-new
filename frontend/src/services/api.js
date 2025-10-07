@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -65,6 +65,11 @@ export const transactionsAPI = {
   update: (id, transactionData) => api.put(`/transactions/${id}`, transactionData),
   delete: (id) => api.delete(`/transactions/${id}`),
   getStats: () => api.get('/transactions/stats/summary'),
+  
+  // Advanced search and filter
+  search: (params = {}) => api.get('/transactions/search', { params }),
+  getSearchSuggestions: (query) => api.get('/transactions/search/suggestions', { params: { query } }),
+  exportSearch: (params = {}) => api.get('/transactions/search/export', { params }),
 };
 
 // Invoices API calls

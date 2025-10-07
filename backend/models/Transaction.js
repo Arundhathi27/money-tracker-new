@@ -49,6 +49,12 @@ const transactionSchema = new mongoose.Schema({
   attachment: {
     type: String, // File path or URL
     default: null
+  },
+  recurringTransactionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RecurringTransaction',
+    default: null,
+    index: true
   }
 }, {
   timestamps: true // Adds createdAt and updatedAt automatically

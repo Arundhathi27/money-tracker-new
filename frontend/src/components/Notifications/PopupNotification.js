@@ -17,7 +17,7 @@ const PopupNotification = ({
   notification,
   onClose,
   onNavigate,
-  duration = 5000,
+  duration = 5001,
   position = 0
 }) => {
   const [isVisible, setIsVisible] = useState(true);

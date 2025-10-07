@@ -20,6 +20,10 @@ const budgetRoutes = require('./routes/budgets');
 const exportRoutes = require('./routes/export');
 const currencyRoutes = require('./routes/currency');
 const groupRoutes = require('./routes/groups');
+const recurringTransactionsRoutes = require('./routes/recurringTransactions');
+
+// Import scheduler
+const recurringTransactionScheduler = require('./services/recurringTransactionScheduler');
 
 const app = express();
 
@@ -48,8 +52,10 @@ app.use(cors({
     'http://127.0.0.1:3002'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 }));
 
 // Body parsing middleware
@@ -71,6 +77,7 @@ app.use('/api/budgets', budgetRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/currency', currencyRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/recurring-transactions', recurringTransactionsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -98,11 +105,27 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Money Tracker API is ready!`);
+  
+  // Start recurring transaction scheduler
+  recurringTransactionScheduler.start();
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  recurringTransactionScheduler.stop();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  recurringTransactionScheduler.stop();
+  process.exit(0);
 });
 
 module.exports = app;

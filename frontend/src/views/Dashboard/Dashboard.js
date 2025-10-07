@@ -18,6 +18,7 @@ import {
   Tr,
   useColorMode,
   useColorModeValue,
+  Spinner,
 } from "@chakra-ui/react";
 // Custom components
 import Card from "components/Card/Card.js";
@@ -32,17 +33,31 @@ import {
   GlobeIcon,
   WalletIcon,
 } from "components/Icons/Icons.js";
-import React from "react";
+import React, { useState, useEffect } from "react";
 // Variables
 import {
-  barChartData,
   barChartOptions,
-  lineChartData,
   lineChartOptions,
 } from "variables/charts";
-import { pageVisits, socialTraffic } from "variables/general";
 
 export default function Dashboard() {
+  // State for dashboard data
+  const [dashboardStats, setDashboardStats] = useState({
+    todaysMoney: { amount: 0, percentage: 0, trend: 'up' },
+    monthlyIncome: { amount: 0, percentage: 0, trend: 'up' },
+    recentTransactions: { amount: 0, percentage: 0, trend: 'up' },
+    totalExpenses: { amount: 0, percentage: 0, trend: 'up' }
+  });
+  const [overviewChartData, setOverviewChartData] = useState([
+    { name: 'Income', data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: 'Expenses', data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
+  ]);
+  const [performanceChartData, setPerformanceChartData] = useState([]);
+  const [performanceCategories, setPerformanceCategories] = useState([]);
+  const [recentIncome, setRecentIncome] = useState([]);
+  const [recentExpenses, setRecentExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   // Chakra Color Mode
   const iconBlue = useColorModeValue("blue.500", "blue.500");
   const iconBoxInside = useColorModeValue("white", "white");
@@ -52,6 +67,144 @@ export default function Dashboard() {
   const textTableColor = useColorModeValue("gray.500", "white");
 
   const { colorMode } = useColorMode();
+
+  // Fetch dashboard data function
+  const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
+
+        // Test API connectivity first
+        try {
+          const testRes = await fetch('/api/dashboard/test', { headers });
+          const testData = await testRes.json();
+          console.log('API Test Response:', testData);
+          
+          // If no transactions found, create sample data
+          if (testData.status === 'success' && testData.data.transactionCount === 0) {
+            console.log('No transactions found, creating sample data...');
+            const sampleRes = await fetch('/api/dashboard/create-sample-data', { 
+              method: 'POST',
+              headers 
+            });
+            const sampleData = await sampleRes.json();
+            console.log('Sample data creation result:', sampleData);
+          }
+        } catch (testError) {
+          console.error('API Test Failed:', testError);
+        }
+        
+        // Fetch all dashboard data in parallel
+        const [statsRes, overviewRes, performanceRes, incomeRes, expensesRes] = await Promise.all([
+          fetch('/api/dashboard/stats', { headers }),
+          fetch('/api/dashboard/charts/overview', { headers }),
+          fetch('/api/dashboard/charts/performance', { headers }),
+          fetch('/api/dashboard/recent-income', { headers }),
+          fetch('/api/dashboard/recent-expenses', { headers })
+        ]);
+
+        const [stats, overview, performance, income, expenses] = await Promise.all([
+          statsRes.json(),
+          overviewRes.json(),
+          performanceRes.json(),
+          incomeRes.json(),
+          expensesRes.json()
+        ]);
+
+        console.log('API Responses:', { stats, overview, performance, income, expenses });
+
+        if (stats.status === 'success') {
+          console.log('Setting dashboard stats:', stats.data.stats);
+          setDashboardStats(stats.data.stats);
+        } else {
+          console.error('Stats API error:', stats);
+        }
+        
+        if (overview.status === 'success') {
+          console.log('Setting overview chart data:', overview.data.chartData);
+          setOverviewChartData(overview.data.chartData || [
+            { name: 'Income', data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+            { name: 'Expenses', data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
+          ]);
+        } else {
+          console.error('Overview API error:', overview);
+        }
+        
+        if (performance.status === 'success') {
+          console.log('Full performance response:', performance);
+          console.log('Performance data object:', performance.data);
+          console.log('Setting performance chart data:', performance.data.chartData);
+          console.log('Setting performance categories:', performance.data.categories);
+          
+          // Only set data if we have actual categories and data
+          if (performance.data.categories && performance.data.categories.length > 0) {
+            setPerformanceChartData(performance.data.chartData);
+            setPerformanceCategories(performance.data.categories);
+          } else {
+            // If no data, show empty state
+            console.log('No categories found, setting empty state');
+            setPerformanceChartData([]);
+            setPerformanceCategories([]);
+          }
+        } else {
+          console.error('Performance API error:', performance);
+        }
+        
+        if (income.status === 'success') {
+          console.log('Setting recent income:', income.data.recentIncome);
+          setRecentIncome(income.data.recentIncome || []);
+        } else {
+          console.error('Income API error:', income);
+        }
+        
+        if (expenses.status === 'success') {
+          console.log('Setting recent expenses:', expenses.data.recentExpenses);
+          setRecentExpenses(expenses.data.recentExpenses || []);
+        } else {
+          console.error('Expenses API error:', expenses);
+        }
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  // Fetch dashboard data on component mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  // Auto-refresh dashboard data every 30 seconds to pick up new transactions
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  if (loading) {
+    return (
+      <Flex justify="center" align="center" h="50vh">
+        <Spinner size="xl" color="blue.500" />
+      </Flex>
+    );
+  }
 
   return (
     <Flex flexDirection='column' pt={{ base: "80px", md: "75px" }} px={{ base: "0px", md: "0px" }}>
@@ -70,11 +223,11 @@ export default function Dashboard() {
                   color='gray.400'
                   fontWeight='bold'
                   textTransform='uppercase'>
-                  Today's Money
+                  Today's Balance
                 </StatLabel>
                 <Flex>
                   <StatNumber fontSize='lg' color={textColor} fontWeight='bold'>
-                    $53,897
+                    {formatCurrency(dashboardStats.todaysMoney.amount)}
                   </StatNumber>
                 </Flex>
               </Stat>
@@ -88,8 +241,8 @@ export default function Dashboard() {
               </IconBox>
             </Flex>
             <Text color='gray.400' fontSize='sm'>
-              <Text as='span' color='green.400' fontWeight='bold'>
-                +3.48%{" "}
+              <Text as='span' color={dashboardStats.todaysMoney.trend === 'up' ? 'green.400' : 'red.400'} fontWeight='bold'>
+                {dashboardStats.todaysMoney.trend === 'up' ? '+' : ''}{dashboardStats.todaysMoney.percentage.toFixed(2)}%{" "}
               </Text>
               Since last month
             </Text>
@@ -109,11 +262,11 @@ export default function Dashboard() {
                   color='gray.400'
                   fontWeight='bold'
                   textTransform='uppercase'>
-                  Today's Users
+                  Monthly Income
                 </StatLabel>
                 <Flex>
                   <StatNumber fontSize='lg' color={textColor} fontWeight='bold'>
-                    $3,200
+                    {formatCurrency(dashboardStats.monthlyIncome.amount)}
                   </StatNumber>
                 </Flex>
               </Stat>
@@ -127,8 +280,8 @@ export default function Dashboard() {
               </IconBox>
             </Flex>
             <Text color='gray.400' fontSize='sm'>
-              <Text as='span' color='green.400' fontWeight='bold'>
-                +5.2%{" "}
+              <Text as='span' color={dashboardStats.monthlyIncome.trend === 'up' ? 'green.400' : 'red.400'} fontWeight='bold'>
+                {dashboardStats.monthlyIncome.trend === 'up' ? '+' : ''}{dashboardStats.monthlyIncome.percentage.toFixed(2)}%{" "}
               </Text>
               Since last month
             </Text>
@@ -148,11 +301,11 @@ export default function Dashboard() {
                   color='gray.400'
                   fontWeight='bold'
                   textTransform='uppercase'>
-                  New Clients
+                  Recent Transactions
                 </StatLabel>
                 <Flex>
                   <StatNumber fontSize='lg' color={textColor} fontWeight='bold'>
-                    +2,503
+                    {dashboardStats.recentTransactions.amount}
                   </StatNumber>
                 </Flex>
               </Stat>
@@ -166,10 +319,10 @@ export default function Dashboard() {
               </IconBox>
             </Flex>
             <Text color='gray.400' fontSize='sm'>
-              <Text as='span' color='red.500' fontWeight='bold'>
-                -2.82%{" "}
+              <Text as='span' color={dashboardStats.recentTransactions.trend === 'up' ? 'green.400' : 'red.400'} fontWeight='bold'>
+                {dashboardStats.recentTransactions.trend === 'up' ? '+' : ''}{dashboardStats.recentTransactions.percentage.toFixed(2)}%{" "}
               </Text>
-              Since last month
+              Last 7 days
             </Text>
           </Flex>
         </Card>
@@ -187,11 +340,11 @@ export default function Dashboard() {
                   color='gray.400'
                   fontWeight='bold'
                   textTransform='uppercase'>
-                  Total Sales
+                  Total Expenses
                 </StatLabel>
                 <Flex>
                   <StatNumber fontSize='lg' color={textColor} fontWeight='bold'>
-                    $173,000
+                    {formatCurrency(dashboardStats.totalExpenses.amount)}
                   </StatNumber>
                 </Flex>
               </Stat>
@@ -205,8 +358,8 @@ export default function Dashboard() {
               </IconBox>
             </Flex>
             <Text color='gray.400' fontSize='sm'>
-              <Text as='span' color='green.400' fontWeight='bold'>
-                +8.12%{" "}
+              <Text as='span' color={dashboardStats.totalExpenses.trend === 'up' ? 'red.400' : 'green.400'} fontWeight='bold'>
+                {dashboardStats.totalExpenses.trend === 'up' ? '+' : ''}{dashboardStats.totalExpenses.percentage.toFixed(2)}%{" "}
               </Text>
               Since last month
             </Text>
@@ -228,40 +381,61 @@ export default function Dashboard() {
           w="100%">
           <Flex direction='column' mb='40px' p='28px 0px 0px 22px'>
             <Text color='#fff' fontSize='lg' fontWeight='bold' mb='6px'>
-              Sales Overview
+              Transaction Overview
             </Text>
             <Text color='#fff' fontSize='sm'>
               <Text as='span' color='green.400' fontWeight='bold'>
-                (+5) more{" "}
+                Income vs Expenses{" "}
               </Text>
-              in 2022
+              for {new Date().getFullYear()}
             </Text>
           </Flex>
           <Box minH='300px'>
-            <LineChart
-              chartData={lineChartData}
-              chartOptions={lineChartOptions}
-            />
+            {overviewChartData && overviewChartData.length > 0 ? (
+              <LineChart
+                chartData={overviewChartData}
+                chartOptions={lineChartOptions}
+              />
+            ) : (
+              <Flex justify="center" align="center" h="300px">
+                <Text color="#fff">No data available</Text>
+              </Flex>
+            )}
           </Box>
         </Card>
         <Card p='0px' maxW={{ base: "100%", md: "100%" }} w="100%">
           <Flex direction='column' mb='40px' p='28px 0px 0px 22px'>
             <Text color='gray.400' fontSize='sm' fontWeight='bold' mb='6px'>
-              PERFORMANCE
+              EXPENSE CATEGORIES
             </Text>
             <Text color={textColor} fontSize='lg' fontWeight='bold'>
-              Total orders
+              Monthly Spending
             </Text>
           </Flex>
           <Box minH='300px'>
-            <BarChart chartData={barChartData} chartOptions={barChartOptions} />
+            {performanceChartData && performanceChartData.length > 0 && performanceCategories.length > 0 ? (
+              <BarChart 
+                chartData={performanceChartData} 
+                chartOptions={{
+                  ...barChartOptions,
+                  xaxis: {
+                    ...barChartOptions.xaxis,
+                    categories: performanceCategories
+                  }
+                }} 
+              />
+            ) : (
+              <Flex justify="center" align="center" h="300px">
+                <Text color={textColor}>No expense data available</Text>
+              </Flex>
+            )}
           </Box>
         </Card>
         <Card p='0px' maxW={{ base: "100%", md: "100%" }} w="100%">
           <Flex direction='column'>
             <Flex align='center' justify='space-between' p={{ base: '16px', md: '22px' }}>
               <Text fontSize={{ base: 'md', md: 'lg' }} color={textColor} fontWeight='bold'>
-                Page visits
+                Recent Income
               </Text>
               <Button variant='primary' maxH='30px' size={{ base: 'sm', md: 'md' }}>
                 SEE ALL
@@ -272,21 +446,21 @@ export default function Dashboard() {
                 <Thead>
                   <Tr bg={tableRowColor}>
                     <Th color='gray.400' borderColor={borderColor}>
-                      Page name
+                      Source
                     </Th>
                     <Th color='gray.400' borderColor={borderColor}>
-                      Visitors
+                      Amount
                     </Th>
                     <Th color='gray.400' borderColor={borderColor}>
-                      Unique users
+                      Date
                     </Th>
                     <Th color='gray.400' borderColor={borderColor}>
-                      Bounce rate
+                      Status
                     </Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {pageVisits.map((el, index, arr) => {
+                  {recentIncome.length > 0 ? recentIncome.map((el, index, arr) => {
                     return (
                       <Tr key={index}>
                         <Td
@@ -295,32 +469,40 @@ export default function Dashboard() {
                           fontWeight='bold'
                           borderColor={borderColor}
                           border={index === arr.length - 1 ? "none" : null}>
-                          {el.pageName}
+                          {el.source}
                         </Td>
                         <Td
                           color={textTableColor}
                           fontSize='sm'
                           border={index === arr.length - 1 ? "none" : null}
                           borderColor={borderColor}>
-                          {el.visitors}
+                          {el.amount}
                         </Td>
                         <Td
                           color={textTableColor}
                           fontSize='sm'
                           border={index === arr.length - 1 ? "none" : null}
                           borderColor={borderColor}>
-                          {el.uniqueUsers}
+                          {el.date}
                         </Td>
                         <Td
                           color={textTableColor}
                           fontSize='sm'
                           border={index === arr.length - 1 ? "none" : null}
                           borderColor={borderColor}>
-                          {el.bounceRate}
+                          <Text color='green.400' fontWeight='bold'>
+                            {el.status}
+                          </Text>
                         </Td>
                       </Tr>
                     );
-                  })}
+                  }) : (
+                    <Tr>
+                      <Td colSpan={4} textAlign="center" color={textTableColor}>
+                        No recent income transactions
+                      </Td>
+                    </Tr>
+                  )}
                 </Tbody>
               </Table>
             </Box>
@@ -330,7 +512,7 @@ export default function Dashboard() {
           <Flex direction='column'>
             <Flex align='center' justify='space-between' p={{ base: '16px', md: '22px' }}>
               <Text fontSize={{ base: 'md', md: 'lg' }} color={textColor} fontWeight='bold'>
-                Social traffic
+                Expense Categories
               </Text>
               <Button variant='primary' maxH='30px' size={{ base: 'sm', md: 'md' }}>
                 SEE ALL
@@ -342,16 +524,18 @@ export default function Dashboard() {
               <Thead>
                 <Tr bg={tableRowColor}>
                   <Th color='gray.400' borderColor={borderColor}>
-                    Referral
+                    Category
                   </Th>
                   <Th color='gray.400' borderColor={borderColor}>
-                    Visitors
+                    Amount
                   </Th>
-                  <Th color='gray.400' borderColor={borderColor}></Th>
+                  <Th color='gray.400' borderColor={borderColor}>
+                    Percentage
+                  </Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {socialTraffic.map((el, index, arr) => {
+                {recentExpenses.length > 0 ? recentExpenses.map((el, index, arr) => {
                   return (
                     <Tr key={index}>
                       <Td
@@ -360,14 +544,14 @@ export default function Dashboard() {
                         fontWeight='bold'
                         borderColor={borderColor}
                         border={index === arr.length - 1 ? "none" : null}>
-                        {el.referral}
+                        {el.category}
                       </Td>
                       <Td
                         color={textTableColor}
                         fontSize='sm'
                         borderColor={borderColor}
                         border={index === arr.length - 1 ? "none" : null}>
-                        {el.visitors}
+                        {el.amount}
                       </Td>
                       <Td
                         color={textTableColor}
@@ -390,7 +574,13 @@ export default function Dashboard() {
                       </Td>
                     </Tr>
                   );
-                })}
+                }) : (
+                  <Tr>
+                    <Td colSpan={3} textAlign="center" color={textTableColor}>
+                      No recent expense data
+                    </Td>
+                  </Tr>
+                )}
               </Tbody>
             </Table>
           </Box>

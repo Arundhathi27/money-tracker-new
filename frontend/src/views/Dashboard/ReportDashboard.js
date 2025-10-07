@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Flex,
@@ -86,13 +86,6 @@ export default function ReportDashboard() {
   const bgCard = useColorModeValue("white", "navy.700");
   const borderColor = useColorModeValue("gray.200", "gray.600");
 
-  // Process report data whenever filters change
-  useEffect(() => {
-    if (transactions && transactions.length > 0) {
-      processReportData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, selectedDate, transactions, customFromDate, customToDate]);
 
   const getFormattedDateRange = () => {
     if (reportType === "daily") {
@@ -187,7 +180,7 @@ export default function ReportDashboard() {
     });
   };
 
-  const processReportData = () => {
+  const processReportData = useCallback(() => {
     try {
       setLoading(true);
 
@@ -352,7 +345,7 @@ export default function ReportDashboard() {
         xaxis: { categories: chartLabels },
         yaxis: {
           labels: {
-            formatter: (v) => `$${v.toFixed(0)}`,
+            formatter: (v) => `₹${v.toFixed(0)}`,
           },
         },
       };
@@ -380,13 +373,20 @@ export default function ReportDashboard() {
         title: "Error",
         description: "Failed to process report data",
         status: "error",
-        duration: 5000,
+        duration: 5001,
         isClosable: true,
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportType, selectedDate, transactions, customFromDate, customToDate, toast]);
+
+  // Process report data whenever filters change
+  useEffect(() => {
+    if (transactions && transactions.length > 0) {
+      processReportData();
+    }
+  }, [reportType, selectedDate, transactions, customFromDate, customToDate, processReportData]);
 
   const handleReportTypeChange = (e) => {
     const newType = e.target.value;
@@ -752,7 +752,7 @@ export default function ReportDashboard() {
                           style: { colors: ["#fff"], fontSize: "12px", fontWeight: "bold" },
                           formatter: (val, opts) => {
                             const value = opts.w.config.series[opts.seriesIndex];
-                            return "$" + value.toFixed(0);
+                            return "₹" + value.toFixed(0);
                           },
                         },
                         plotOptions: {
@@ -762,7 +762,7 @@ export default function ReportDashboard() {
                           },
                         },
                         tooltip: {
-                          y: { formatter: (val) => "$" + val.toFixed(2) },
+                          y: { formatter: (val) => "₹" + val.toFixed(2) },
                         },
                       }}
                     />
@@ -811,14 +811,14 @@ export default function ReportDashboard() {
                             _last={{ borderBottom: "none" }}
                           >
                             <Text flex="1">{label}</Text>
-                            <Text flex="1" textAlign="right" color="green.500">${income.toFixed(2)}</Text>
-                            <Text flex="1" textAlign="right" color="red.500">${expenses.toFixed(2)}</Text>
+                            <Text flex="1" textAlign="right" color="green.500">₹{income.toFixed(2)}</Text>
+                            <Text flex="1" textAlign="right" color="red.500">₹{expenses.toFixed(2)}</Text>
                             <Text 
                               flex="1" 
                               textAlign="right" 
                               color={net >= 0 ? "green.500" : "red.500"}
                             >
-                              ${net.toFixed(2)}
+                              ₹{net.toFixed(2)}
                             </Text>
                           </Flex>
                         );
@@ -884,7 +884,7 @@ const SummaryCard = ({ title, amount, change, color, icon, textColor, borderColo
       </Box>
     </Flex>
     <Text fontSize="2xl" fontWeight="bold" color={textColor}>
-      ${amount.toFixed(2)}
+      ₹{amount.toFixed(2)}
     </Text>
     <Text fontSize="sm" color={change >= 0 ? "green.500" : "red.500"}>
       {change >= 0 ? "+" : ""}
