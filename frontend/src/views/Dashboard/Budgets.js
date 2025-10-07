@@ -85,7 +85,7 @@ const Budgets = () => {
         title: "Creation Failed",
         description: error.message || 'Failed to create budget',
         status: "error",
-        duration: 5000,
+        duration: 5001,
         isClosable: true,
       });
     }

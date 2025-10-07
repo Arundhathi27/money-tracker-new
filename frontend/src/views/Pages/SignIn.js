@@ -23,6 +23,7 @@ import signInImage from "assets/img/signInImage.png";
 import { FaApple, FaFacebook, FaGoogle } from "react-icons/fa";
 import { useHistory } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../contexts/AuthContext";
 
 function SignIn() {
   const [formData, setFormData] = useState({
@@ -35,6 +36,7 @@ function SignIn() {
   
   const history = useHistory();
   const toast = useToast();
+  const { login } = useAuth();
   
   // Chakra color mode
   const textColor = useColorModeValue("gray.700", "white");
@@ -72,14 +74,14 @@ function SignIn() {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post('http://localhost:5001/api/auth/login', {
         email: formData.email.trim(),
         password: formData.password
       });
 
       if (response.data.status === 'success') {
-        // Store only token - user data will be fetched from API
-        localStorage.setItem('token', response.data.data.token);
+        // Use AuthContext login method
+        login(response.data.data.token, response.data.data.user);
 
         // Show success message
         toast({
@@ -104,7 +106,7 @@ function SignIn() {
         title: "Login Failed",
         description: errorMessage,
         status: "error",
-        duration: 5000,
+        duration: 5001,
         isClosable: true,
       });
     } finally {

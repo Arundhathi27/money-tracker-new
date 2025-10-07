@@ -25,6 +25,7 @@ import React, { useState } from "react";
 import { FaApple, FaFacebook, FaGoogle } from "react-icons/fa";
 import { useHistory } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../contexts/AuthContext";
 
 function SignUp() {
   const [formData, setFormData] = useState({
@@ -38,6 +39,7 @@ function SignUp() {
   
   const history = useHistory();
   const toast = useToast();
+  const { login } = useAuth();
   
   const bgForm = useColorModeValue("white", "navy.800");
   const titleColor = useColorModeValue("gray.700", "blue.500");
@@ -84,31 +86,29 @@ function SignUp() {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', {
+      const response = await axios.post('http://localhost:5001/api/auth/register', {
         name: formData.name.trim(),
         email: formData.email.trim(),
         password: formData.password
       });
 
       if (response.data.status === 'success') {
-        // Store only token if remember me is checked - user data will be fetched from API
-        if (rememberMe) {
-          localStorage.setItem('token', response.data.data.token);
-        }
+        // Auto-login user after successful registration
+        login(response.data.data.token, response.data.data.user);
 
         // Show success message
         toast({
           title: "Registration Successful!",
-          description: `Welcome ${response.data.data.user.name}! You can now sign in.`,
+          description: `Welcome ${response.data.data.user.name}! Redirecting to dashboard...`,
           status: "success",
-          duration: 5000,
+          duration: 3000,
           isClosable: true,
         });
 
-        // Redirect to sign in page
+        // Redirect to dashboard
         setTimeout(() => {
-          history.push('/auth/signin');
-        }, 2000);
+          history.push('/admin/dashboard');
+        }, 1000);
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -119,7 +119,7 @@ function SignUp() {
         title: "Registration Failed",
         description: errorMessage,
         status: "error",
-        duration: 5000,
+        duration: 5001,
         isClosable: true,
       });
     } finally {

@@ -22,12 +22,13 @@ import { SearchBar } from "components/Navbars/SearchBar/SearchBar";
 import { SidebarResponsive } from "components/Sidebar/Sidebar";
 import NotificationItem from "components/Notifications/NotificationItem";
 import { useNotifications } from "contexts/NotificationContext";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { NavLink, useHistory } from "react-router-dom";
 import routes from "routes.js";
 import { isAuthenticated, getUser, setAuthToken, profileUpdateEvent } from "services/api.js";
+import { useAuth } from "../../contexts/AuthContext";
 
-export default function HeaderLinks(props) {
+const HeaderLinks = React.memo(function HeaderLinks(props) {
   const {
     variant,
     children,
@@ -39,8 +40,7 @@ export default function HeaderLinks(props) {
   } = props;
 
   const { colorMode } = useColorMode();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser, authenticated: isLoggedIn, logout } = useAuth();
   const history = useHistory();
   
   // Use notifications context
@@ -53,8 +53,14 @@ export default function HeaderLinks(props) {
     refreshNotifications 
   } = useNotifications();
 
+  // Memoize the logout handler to prevent re-renders
+  const handleLogout = useCallback(() => {
+    logout();
+    history.push('/auth/signup');
+  }, [logout, history]);
+
   // Handle notification click navigation
-  const handleNotificationClick = (notification) => {
+  const handleNotificationClick = useCallback((notification) => {
     // Mark as read
     if (!notification.isRead) {
       markAsRead(notification.id);
@@ -68,52 +74,17 @@ export default function HeaderLinks(props) {
       default:
         console.log('No navigation defined for notification type:', notification.type);
     }
-  };
+  }, [markAsRead, history]);
 
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      const authenticated = isAuthenticated();
-      setIsLoggedIn(authenticated);
-      if (authenticated) {
-        try {
-          const user = await getUser();
-          setCurrentUser(user);
-        } catch (error) {
-          console.error('Error fetching user:', error);
-          setIsLoggedIn(false);
-          setCurrentUser(null);
-        }
-      }
-    };
-
-    const handleProfileUpdate = (event) => {
-      const updatedUser = event.detail;
-      setCurrentUser(updatedUser);
-    };
-
-    checkAuthStatus();
-    
-    // Listen for profile updates
-    profileUpdateEvent.addEventListener('profileUpdated', handleProfileUpdate);
-    
-    // Listen for storage changes to update auth status
-    window.addEventListener('storage', checkAuthStatus);
-    
-    return () => {
-      profileUpdateEvent.removeEventListener('profileUpdated', handleProfileUpdate);
-      window.removeEventListener('storage', checkAuthStatus);
-    };
-  }, []);
-
-  // Chakra Color Mode
-  let navbarIcon =
-    fixed && scrolled
+  // Memoize color values to prevent unnecessary re-renders
+  const navbarIcon = useMemo(() => {
+    if (secondary) return "white";
+    return fixed && scrolled
       ? useColorModeValue("gray.700", "gray.200")
       : useColorModeValue("white", "gray.200");
-  let menuBg = useColorModeValue("white", "navy.800");
-  if (secondary) {
-    navbarIcon = "white";
-  }
+  }, [fixed, scrolled, secondary]);
+  
+  const menuBg = useColorModeValue("white", "navy.800");
   return (
     <Flex
       pe={{ sm: "0px", md: "16px" }}
@@ -136,7 +107,7 @@ export default function HeaderLinks(props) {
               <Avatar
                 size="sm"
                 name={currentUser.name || currentUser.email}
-                src={currentUser.profilePicture || currentUser.avatar}
+                src={currentUser.profilePicture || currentUser.avatar || undefined}
                 me="8px"
               />
               <Text color={navbarIcon} fontSize="sm" fontWeight="medium" noOfLines={1}>
@@ -189,14 +160,7 @@ export default function HeaderLinks(props) {
                   </MenuItem>
                   <MenuItem
                     borderRadius="8px"
-                    onClick={() => {
-                      localStorage.removeItem("token");
-                      localStorage.removeItem("user");
-                      setAuthToken(null);
-                      setIsLoggedIn(false);
-                      setCurrentUser(null);
-                      window.location.href = "#/auth/signin";
-                    }}
+                    onClick={handleLogout}
                   >
                     <Flex alignItems="center">
                       <Box w="16px" h="16px" me="8px">
@@ -358,7 +322,7 @@ export default function HeaderLinks(props) {
                 <Avatar
                   size="sm"
                   name={currentUser.name || currentUser.email}
-                  src={currentUser.profilePicture || currentUser.avatar}
+                  src={currentUser.profilePicture || currentUser.avatar || undefined}
                   me="8px"
                 />
                 <Text
@@ -381,14 +345,7 @@ export default function HeaderLinks(props) {
               </MenuItem>
             <MenuItem 
               borderRadius="8px" 
-              onClick={() => {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                setAuthToken(null);
-                setIsLoggedIn(false);
-                setCurrentUser(null);
-                window.location.href = '#/auth/signin';
-              }}
+              onClick={handleLogout}
             >
                 <Flex alignItems="center">
                   <Box w="16px" h="16px" me="8px">
@@ -552,4 +509,6 @@ export default function HeaderLinks(props) {
       </Flex>
     </Flex>
   );
-}
+});
+
+export default HeaderLinks;

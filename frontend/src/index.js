@@ -29,20 +29,30 @@ import theme from "theme/theme.js";
 import { NotificationProvider } from "contexts/NotificationContext.js";
 // Group Context
 import { GroupProvider } from "contexts/GroupContext.js";
+// Auth Context
+import { AuthProvider } from "contexts/AuthContext.js";
+// Protected Route Component
+import ProtectedRoute from "components/ProtectedRoute/ProtectedRoute.js";
 
 ReactDOM.render(
   <ChakraProvider theme={theme} resetCss={false} position="relative">
-    <NotificationProvider>
-      <GroupProvider>
-        <HashRouter>
-          <Switch>
-            <Route path={`/auth`} component={AuthLayout} />
-            <Route path={`/admin`} component={AdminLayout} />
-            <Redirect from={`/`} to="/admin/dashboard" />
-          </Switch>
-        </HashRouter>
-      </GroupProvider>
-    </NotificationProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <GroupProvider>
+          <HashRouter>
+            <Switch>
+              <Route path={`/auth`} component={AuthLayout} />
+              <Route path={`/admin`}>
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              </Route>
+              <Redirect from={`/`} to="/auth/signup" />
+            </Switch>
+          </HashRouter>
+        </GroupProvider>
+      </NotificationProvider>
+    </AuthProvider>
   </ChakraProvider>,
   document.getElementById("root")
 );

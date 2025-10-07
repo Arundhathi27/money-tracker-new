@@ -109,6 +109,235 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// Advanced Search and Filter Routes (MUST be before /:id route)
+
+/**
+ * @route   GET /api/transactions/search
+ * @desc    Advanced search and filter transactions
+ * @access  Private
+ */
+router.get('/search', authenticateToken, async (req, res) => {
+  try {
+    const {
+      keyword = '',
+      amountMin,
+      amountMax,
+      dateFrom,
+      dateTo,
+      categories = '',
+      transactionType = '',
+      page = 1,
+      limit = 25,
+      sortBy = 'date',
+      sortOrder = 'DESC'
+    } = req.query;
+
+    const userId = req.user.id;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build MongoDB query conditions
+    const matchConditions = {
+      userId: userId
+    };
+
+    // Keyword search (notes field - assuming description is stored in notes)
+    if (keyword.trim()) {
+      matchConditions.$or = [
+        { notes: { $regex: keyword.trim(), $options: 'i' } },
+        { category: { $regex: keyword.trim(), $options: 'i' } }
+      ];
+    }
+
+    // Amount range filter
+    if (amountMin || amountMax) {
+      matchConditions.amount = {};
+      if (amountMin) {
+        matchConditions.amount.$gte = parseFloat(amountMin);
+      }
+      if (amountMax) {
+        matchConditions.amount.$lte = parseFloat(amountMax);
+      }
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      matchConditions.date = {};
+      if (dateFrom) {
+        matchConditions.date.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        // Add 1 day to include the entire end date
+        const endDate = new Date(dateTo);
+        endDate.setDate(endDate.getDate() + 1);
+        matchConditions.date.$lt = endDate;
+      }
+    }
+
+    // Category filter
+    let categoryNames = [];
+    if (Array.isArray(categories)) {
+      // Handle array format: categories[]=Transportation&categories[]=Gift
+      categoryNames = categories.filter(name => name && name.trim());
+    } else if (typeof categories === 'string' && categories.trim()) {
+      // Handle comma-separated string format: categories=Transportation,Gift
+      categoryNames = categories.split(',').map(name => name.trim()).filter(name => name);
+    }
+    
+    if (categoryNames.length > 0) {
+      matchConditions.category = { $in: categoryNames };
+    }
+
+    // Transaction type filter
+    if (transactionType && ['income', 'expense'].includes(transactionType.toLowerCase())) {
+      matchConditions.type = transactionType.toLowerCase();
+    }
+
+    // Build sort object
+    const validSortFields = ['date', 'amount', 'notes', 'createdAt'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'date';
+    const sortDirection = sortOrder.toUpperCase() === 'ASC' ? 1 : -1;
+    const sortObj = { [sortField]: sortDirection };
+
+    // Execute search query with pagination
+    const transactions = await Transaction.find(matchConditions)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Get total count for pagination
+    const totalCount = await Transaction.countDocuments(matchConditions);
+
+    // Calculate statistics using aggregation
+    const statsResult = await Transaction.aggregate([
+      { $match: matchConditions },
+      {
+        $group: {
+          _id: null,
+          totalCount: { $sum: 1 },
+          totalIncome: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0]
+            }
+          },
+          totalExpense: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    const stats = statsResult[0] || {
+      totalCount: 0,
+      totalIncome: 0,
+      totalExpense: 0
+    };
+
+    // Calculate net amount (income - expense)
+    const netAmount = (stats.totalIncome || 0) - (stats.totalExpense || 0);
+
+    // Format response
+    const response = {
+      success: true,
+      data: {
+        transactions: transactions.map(transaction => ({
+          id: transaction._id,
+          description: transaction.notes || '', // Using notes as description
+          amount: parseFloat(transaction.amount),
+          type: transaction.type,
+          date: transaction.date,
+          notes: transaction.notes || '',
+          category: transaction.category, // Keep as string to match existing frontend
+          createdAt: transaction.createdAt,
+          updatedAt: transaction.updatedAt
+        })),
+        pagination: {
+          currentPage: parseInt(page),
+          pageSize: parseInt(limit),
+          totalCount: totalCount,
+          totalPages: Math.ceil(totalCount / parseInt(limit)),
+          hasNext: skip + parseInt(limit) < totalCount,
+          hasPrev: parseInt(page) > 1
+        },
+        statistics: {
+          totalCount: stats.totalCount || 0,
+          totalAmount: netAmount,
+          incomeAmount: stats.totalIncome || 0,
+          expenseAmount: stats.totalExpense || 0,
+          netAmount: netAmount
+        }
+      }
+    };
+
+    res.json(response);
+
+  } catch (error) {
+    console.error('Transaction search error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error searching transactions',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+/**
+ * @route   GET /api/transactions/search/suggestions
+ * @desc    Get search suggestions based on user's transaction history
+ * @access  Private
+ */
+router.get('/search/suggestions', authenticateToken, async (req, res) => {
+  try {
+    const { query = '', limit = 10 } = req.query;
+    const userId = req.user.id;
+
+    // Get unique categories and notes that match the query using aggregation
+    const suggestions = await Transaction.aggregate([
+      {
+        $match: {
+          userId: userId,
+          $or: [
+            { notes: { $regex: query.trim(), $options: 'i' } },
+            { category: { $regex: query.trim(), $options: 'i' } }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: '$notes',
+          frequency: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { frequency: -1 }
+      },
+      {
+        $limit: parseInt(limit)
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        suggestions: suggestions.map(s => ({
+          text: s._id,
+          frequency: s.frequency
+        })).filter(s => s.text && s.text.trim()) // Filter out empty suggestions
+      }
+    });
+
+  } catch (error) {
+    console.error('Search suggestions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching search suggestions',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 // @route   GET /api/transactions/:id
 // @desc    Get single transaction
 // @access  Private
@@ -479,5 +708,6 @@ router.get('/stats/summary', authenticateToken, async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;

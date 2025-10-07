@@ -106,6 +106,9 @@ export const lineChartOptions = {
       "Jul",
       "Aug",
       "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ],
     axisTicks: {
       show: false
